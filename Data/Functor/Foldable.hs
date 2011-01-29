@@ -51,6 +51,9 @@ module Data.Functor.Foldable
   , fold, gfold
   , unfold, gunfold
   , refold, grefold
+  -- * Mendler-style
+  , mcata
+  , mhisto
   ) where
 
 import Control.Applicative
@@ -84,6 +87,8 @@ class Functor (Base t) => Foldable t where
   gpara :: (Unfoldable t, Comonad w) => (forall b. Base t (w b) -> w (Base t b)) -> (Base t (EnvT t w a) -> a) -> t -> a
   gpara = gzygo embed
 
+mcata :: Foldable t => (forall y. (y -> c) -> Base t y -> c) -> t -> c
+mcata psi = psi (mcata psi) . project
 
 distPara :: Unfoldable t => Base t (t, a) -> (t, Base t a)
 distPara = distZygo embed
@@ -282,7 +287,7 @@ distZygoT
   -> f (EnvT b w a) -> EnvT b w (f a)  -- A new distributive law that adds semi-mutual recursion
 distZygoT g k fe = EnvT (g (getEnv <$> fe)) (k (lower <$> fe))
   where getEnv (EnvT e _) = e 
-    
+
 gapo :: Unfoldable t => (b -> Base t b) -> (a -> Base t (Either b a)) -> a -> t
 gapo g = gunfold (distGApo g)
 
@@ -292,11 +297,16 @@ distApo = distGApo project
 distGApo :: Functor f => (b -> f b) -> Either b (f a) -> f (Either b a)
 distGApo f = either (fmap Left . f) (fmap Right)
 
+-- | Course-of-value iteration
 histo :: Foldable t => (Base t (Stream (Base t) a) -> a) -> t -> a
 histo = gfold (distHisto id)
 
 ghisto :: (Foldable t, Functor h) => (forall b. Base t (h b) -> h (Base t b)) -> (Base t (Stream h a) -> a) -> t -> a
 ghisto g = gfold (distHisto g)
+
+-- | Mendler-style course-of-value iteration
+mhisto :: Foldable t => (forall y. (y -> c) -> (y -> Base t y) -> Base t y -> c) -> t -> c
+mhisto psi = psi (mhisto psi) project . project
 
 distHisto :: (Functor f, Functor h) => (forall b. f (h b) -> h (f b)) -> f (Stream h a) -> Stream h (f a)
 distHisto k = Stream.unfold (\as -> (Stream.head <$> as, k (Stream.tail <$> as)))
