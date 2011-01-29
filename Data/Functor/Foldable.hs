@@ -82,10 +82,10 @@ class Functor (Base t) => Foldable t where
   cata f = c where c = f . fmap c . project
 
   para :: Unfoldable t => (Base t (t, a) -> a) -> t -> a
-  para = zygo embed
+  para t = zygo embed t
 
   gpara :: (Unfoldable t, Comonad w) => (forall b. Base t (w b) -> w (Base t b)) -> (Base t (EnvT t w a) -> a) -> t -> a
-  gpara = gzygo embed
+  gpara t = gzygo embed t
 
 mcata :: Foldable t => (forall y. (y -> c) -> Base t y -> c) -> t -> c
 mcata psi = psi (mcata psi) . project
@@ -94,7 +94,7 @@ distPara :: Unfoldable t => Base t (t, a) -> (t, Base t a)
 distPara = distZygo embed
 
 distParaT :: (Unfoldable t, Comonad w) => (forall b. Base t (w b) -> w (Base t b)) -> Base t (EnvT t w a) -> EnvT t w (Base t a)
-distParaT = distZygoT embed
+distParaT t = distZygoT embed t
 
 class Functor (Base t) => Unfoldable t where
   embed :: Base t t -> t
@@ -160,7 +160,7 @@ gfold, gcata
   -> a
 gcata k g = g . extract . c where 
   c = k . fmap (duplicate . fmap g . c) . project
-gfold = gcata
+gfold k g t = gcata k g t
 
 distCata :: Functor f => f (Identity a) -> Identity (f a)
 distCata = Identity . fmap runIdentity
@@ -174,7 +174,7 @@ gunfold, gana
   -> t
 gana k f = a . return . f where 
   a = embed . fmap (a . liftM f . join) . k
-gunfold = gana
+gunfold k f t = gana k f t
 
 distAna :: Functor f => Identity (f a) -> f (Identity a)
 distAna = fmap Identity . runIdentity
@@ -190,7 +190,7 @@ grefold, ghylo
   -> b
 ghylo w m f g = extract . h . return where 
   h = fmap f . w . fmap (duplicate . h . join) . m . liftM g
-grefold = ghylo
+grefold w m f g a = ghylo w m f g a
 
 newtype Fix f = Fix (f (Fix f))
 deriving instance Eq (f (Fix f)) => Eq (Fix f)
@@ -215,17 +215,17 @@ fromFix = refix
 
 newtype Mu f = Mu (forall a. (f a -> a) -> a)
 
-instance (Functor f, Eq (Fix f)) => Eq (Mu f) where
+instance (Functor f, Eq (f (Fix f)), Eq (Fix f)) => Eq (Mu f) where
   (==) = (==) `on` toFix
 
-instance (Functor f, Ord (Fix f)) => Ord (Mu f) where
+instance (Functor f, Ord (f (Fix f)), Ord (Fix f)) => Ord (Mu f) where
   compare = compare `on` toFix
 
-instance (Functor f, Show (Fix f)) => Show (Mu f) where
+instance (Functor f, Show (f (Fix f)), Show (Fix f)) => Show (Mu f) where
   showsPrec d f = showParen (d > 10) $
     showString "fromFix " . showsPrec 11 (toFix f)
 
-instance (Functor f, Read (Fix f)) => Read (Mu f) where
+instance (Functor f, Read (f (Fix f)), Read (Fix f)) => Read (Mu f) where
   readPrec = parens $ prec 10 $ do
     Ident "fromFix" <- lexP
     fromFix <$> step readPrec
@@ -239,17 +239,17 @@ instance Functor f => Unfoldable (Mu f) where
 
 data Nu f where Nu :: (a -> f a) -> a -> Nu f
 
-instance (Functor f, Eq (Fix f)) => Eq (Nu f) where
+instance (Functor f, Eq (f (Fix f)), Eq (Fix f)) => Eq (Nu f) where
   (==) = (==) `on` toFix
 
-instance (Functor f, Ord (Fix f)) => Ord (Nu f) where
+instance (Functor f, Ord (f (Fix f)), Ord (Fix f)) => Ord (Nu f) where
   compare = compare `on` toFix
 
-instance (Functor f, Show (Fix f)) => Show (Nu f) where
+instance (Functor f, Show (f (Fix f)), Show (Fix f)) => Show (Nu f) where
   showsPrec d f = showParen (d > 10) $
     showString "fromFix " . showsPrec 11 (toFix f)
 
-instance (Functor f, Read (Fix f)) => Read (Nu f) where
+instance (Functor f, Read (f (Fix f)), Read (Fix f)) => Read (Nu f) where
   readPrec = parens $ prec 10 $ do
     Ident "fromFix" <- lexP
     fromFix <$> step readPrec
