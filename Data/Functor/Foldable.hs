@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, Rank2Types, FlexibleContexts, FlexibleInstances, GADTs, StandaloneDeriving, UndecidableInstances #-}
+{-# LANGUAGE CPP, TypeFamilies, Rank2Types, FlexibleContexts, FlexibleInstances, GADTs, StandaloneDeriving, UndecidableInstances, DeriveDataTypeable #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Functor.Foldable
@@ -7,7 +7,7 @@
 --
 -- Maintainer  :  Edward Kmett <ekmett@gmail.com>
 -- Stability   :  experimental
--- Portability :  non-portable (rank-2 polymorphism)
+-- Portability :  non-portable
 -- 
 ----------------------------------------------------------------------------
 module Data.Functor.Foldable
@@ -66,6 +66,8 @@ import Data.Function (on)
 import qualified Data.Stream.Branching as Stream
 import Data.Stream.Branching (Stream(..))
 import Text.Read
+import Data.Data hiding (gunfold)
+import qualified Data.Data as Data
 
 type family Base t :: * -> *
 
@@ -86,9 +88,6 @@ class Functor (Base t) => Foldable t where
 
   gpara :: (Unfoldable t, Comonad w) => (forall b. Base t (w b) -> w (Base t b)) -> (Base t (EnvT t w a) -> a) -> t -> a
   gpara t = gzygo embed t
-
-mcata :: Foldable t => (forall y. (y -> c) -> Base t y -> c) -> t -> c
-mcata psi = psi (mcata psi) . project
 
 distPara :: Unfoldable t => Base t (t, a) -> (t, Base t a)
 distPara = distZygo embed
@@ -193,10 +192,39 @@ ghylo w m f g = extract . h . return where
 grefold w m f g a = ghylo w m f g a
 
 newtype Fix f = Fix (f (Fix f))
+
+unfix :: Fix f -> f (Fix f)
+unfix (Fix f) = f
+
 deriving instance Eq (f (Fix f)) => Eq (Fix f)
 deriving instance Ord (f (Fix f)) => Ord (Fix f)
 deriving instance Show (f (Fix f)) => Show (Fix f)
 deriving instance Read (f (Fix f)) => Read (Fix f)
+
+#ifdef __GLASGOW_HASKELL__
+instance Typeable1 f => Typeable (Fix f) where
+  typeOf t = mkTyConApp fixTyCon [typeOf1 (undefined `asArgsTypeOf` t)]
+    where asArgsTypeOf :: f a -> Fix f -> f a
+          asArgsTypeOf = const
+  
+fixTyCon :: TyCon
+fixTyCon = mkTyCon "Data.Functor.Foldable.Fix"
+{-# NOINLINE fixTyCon #-}
+
+instance (Typeable1 f, Data (f (Fix f))) => Data (Fix f) where
+  gfoldl f z (Fix a) = z Fix `f` a
+  toConstr _ = fixConstr
+  gunfold k z c = case constrIndex c of
+    1 -> k (z (Fix))
+    _ -> error "gunfold"
+  dataTypeOf _ = fixDataType
+
+fixConstr :: Constr
+fixConstr = mkConstr fixDataType "Fix" [] Prefix
+
+fixDataType :: DataType
+fixDataType = mkDataType "Data.Functor.Foldable.Fix" [fixConstr]
+#endif
 
 type instance Base (Fix f) = f
 instance Functor f => Foldable (Fix f) where
@@ -213,7 +241,21 @@ toFix = refix
 fromFix :: Unfoldable t => Fix (Base t) -> t
 fromFix = refix
 
+-- | Lambek's lemma provides a default definition for 'project' in terms of 'cata' and 'embed'
+lambek :: (Foldable t, Unfoldable t) => (t -> Base t t)
+lambek = cata (fmap embed)
+
+-- | The dual of Lambek's lemma, provides a default definition for 'embed' in terms of 'ana' and 'project'
+colambek :: (Foldable t, Unfoldable t) => (Base t t -> t)
+colambek = ana (fmap project)
+
 newtype Mu f = Mu (forall a. (f a -> a) -> a)
+type instance Base (Mu f) = f
+instance Functor f => Foldable (Mu f) where
+  project = lambek
+  cata f (Mu g) = g f
+instance Functor f => Unfoldable (Mu f) where
+  embed m = Mu (\f -> f (fmap (fold f) m))
 
 instance (Functor f, Eq (f (Fix f)), Eq (Fix f)) => Eq (Mu f) where
   (==) = (==) `on` toFix
@@ -225,19 +267,20 @@ instance (Functor f, Show (f (Fix f)), Show (Fix f)) => Show (Mu f) where
   showsPrec d f = showParen (d > 10) $
     showString "fromFix " . showsPrec 11 (toFix f)
 
+#ifdef __GLASGOW_HASKELL__
 instance (Functor f, Read (f (Fix f)), Read (Fix f)) => Read (Mu f) where
   readPrec = parens $ prec 10 $ do
     Ident "fromFix" <- lexP
     fromFix <$> step readPrec
-
-type instance Base (Mu f) = f
-instance Functor f => Foldable (Mu f) where
-  project = fold (fmap embed) 
-  cata f (Mu g) = g f
-instance Functor f => Unfoldable (Mu f) where
-  embed m = Mu (\f -> f (fmap (fold f) m))
+#endif
 
 data Nu f where Nu :: (a -> f a) -> a -> Nu f
+type instance Base (Nu f) = f
+instance Functor f => Unfoldable (Nu f) where
+  embed = colambek
+  ana = Nu 
+instance Functor f => Foldable (Nu f) where
+  project (Nu f a) = Nu f <$> f a
 
 instance (Functor f, Eq (f (Fix f)), Eq (Fix f)) => Eq (Nu f) where
   (==) = (==) `on` toFix
@@ -249,18 +292,12 @@ instance (Functor f, Show (f (Fix f)), Show (Fix f)) => Show (Nu f) where
   showsPrec d f = showParen (d > 10) $
     showString "fromFix " . showsPrec 11 (toFix f)
 
+#ifdef __GLASGOW_HASKELL__
 instance (Functor f, Read (f (Fix f)), Read (Fix f)) => Read (Nu f) where
   readPrec = parens $ prec 10 $ do
     Ident "fromFix" <- lexP
     fromFix <$> step readPrec
-
-type instance Base (Mu f) = f
-type instance Base (Nu f) = f
-instance Functor f => Unfoldable (Nu f) where
-  embed = unfold (fmap project)
-  ana = Nu 
-instance Functor f => Foldable (Nu f) where
-  project (Nu f a) = fmap (Nu f) (f a)
+#endif
 
 zygo :: Foldable t => (Base t b -> b) -> (Base t (b, a) -> a) -> t -> a
 zygo f = gfold (distZygo f)
@@ -304,12 +341,16 @@ histo = gfold (distHisto id)
 ghisto :: (Foldable t, Functor h) => (forall b. Base t (h b) -> h (Base t b)) -> (Base t (Stream h a) -> a) -> t -> a
 ghisto g = gfold (distHisto g)
 
--- | Mendler-style course-of-value iteration
-mhisto :: Foldable t => (forall y. (y -> c) -> (y -> Base t y) -> Base t y -> c) -> t -> c
-mhisto psi = psi (mhisto psi) project . project
-
 distHisto :: (Functor f, Functor h) => (forall b. f (h b) -> h (f b)) -> f (Stream h a) -> Stream h (f a)
 distHisto k = Stream.unfold (\as -> (Stream.head <$> as, k (Stream.tail <$> as)))
 
 -- TODO: futu & chrono, these require Free monads 
 -- TODO: distGApoT, requires EitherT
+
+-- | Mendler-style iteration
+mcata :: (forall y. (y -> c) -> f y -> c) -> Fix f -> c
+mcata psi = psi (mcata psi) . unfix
+
+-- | Mendler-style course-of-value iteration
+mhisto :: (forall y. (y -> c) -> (y -> f y) -> f y -> c) -> Fix f -> c
+mhisto psi = psi (mhisto psi) unfix . unfix

@@ -1,6 +1,6 @@
 name:          recursion-schemes
 category:      Control, Recursion
-version:       0.1.1
+version:       0.2
 license:       BSD3
 cabal-version: >= 1.6
 license-file:  LICENSE
@@ -10,7 +10,15 @@ stability:     provisional
 homepage:      http://github.com/ekmett/recursion-schemes/
 copyright:     Copyright (C) 2008-2011 Edward A. Kmett
 synopsis:      Generalized bananas, lenses and barbed wire
-description:   Generalized bananas, lenses and barbed wire
+description:   
+  Generalized bananas, lenses and barbed wire
+  . 
+  /Changes since 0.1/:
+  .
+  * Removed dependency on Foldable from Mendler-style recursion schemes
+  .
+  * Added Lambek's Lemma
+  
 build-type:    Simple
 
 source-repository head
