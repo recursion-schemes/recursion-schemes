@@ -1,6 +1,6 @@
 name:          recursion-schemes
 category:      Control, Recursion
-version:       0.2
+version:       0.2.1
 license:       BSD3
 cabal-version: >= 1.6
 license-file:  LICENSE
@@ -13,6 +13,10 @@ synopsis:      Generalized bananas, lenses and barbed wire
 description:   
   Generalized bananas, lenses and barbed wire
   . 
+  /Changes since 0.2/:
+  .
+  * Added Elgot (co)algebras
+  .
   /Changes since 0.1/:
   .
   * Removed dependency on Foldable from Mendler-style recursion schemes
@@ -31,6 +35,7 @@ library
     transformers >= 0.2.0 && < 0.3,
     comonad >= 0.9.0.1 && < 0.10,
     comonad-transformers >= 0.10.1.1 && < 0.11,
+    bifunctors >= 0.1 && < 0.2,
     streams >= 0.5.0 && < 0.6
 
   exposed-modules:

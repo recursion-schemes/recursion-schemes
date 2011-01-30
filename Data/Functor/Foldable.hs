@@ -54,6 +54,9 @@ module Data.Functor.Foldable
   -- * Mendler-style
   , mcata
   , mhisto
+  -- * Elgot (co)algebras
+  , elgot
+  , coelgot
   ) where
 
 import Control.Applicative
@@ -62,6 +65,7 @@ import Control.Comonad.Trans.Class
 import Control.Comonad.Trans.Env
 import Control.Monad (liftM, join)
 import Data.Functor.Identity
+import Control.Arrow
 import Data.Function (on)
 import qualified Data.Stream.Branching as Stream
 import Data.Stream.Branching (Stream(..))
@@ -354,3 +358,11 @@ mcata psi = psi (mcata psi) . unfix
 -- | Mendler-style course-of-value iteration
 mhisto :: (forall y. (y -> c) -> (y -> f y) -> f y -> c) -> Fix f -> c
 mhisto psi = psi (mhisto psi) unfix . unfix
+
+-- | Elgot algebras
+elgot :: Functor f => (f a -> a) -> (b -> Either a (f b)) -> b -> a
+elgot phi psi = h where h = (id ||| phi . fmap h) . psi
+
+-- | Elgot coalgebras: <http://comonad.com/reader/2008/elgot-coalgebras/>
+coelgot :: Functor f => ((a, f b) -> b) -> (a -> f a) -> a -> b
+coelgot phi psi = h where h = phi . (id &&& fmap h . psi)
