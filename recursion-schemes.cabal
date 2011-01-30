@@ -1,6 +1,6 @@
 name:          recursion-schemes
 category:      Control, Recursion
-version:       0.2.1
+version:       0.2.2
 license:       BSD3
 cabal-version: >= 1.6
 license-file:  LICENSE
@@ -13,6 +13,10 @@ synopsis:      Generalized bananas, lenses and barbed wire
 description:   
   Generalized bananas, lenses and barbed wire
   . 
+  /Changes since 0.2.1/:
+  .
+  * Added (generalized) prepro- and postpro- morphisms
+  .
   /Changes since 0.2/:
   .
   * Added Elgot (co)algebras

@@ -93,6 +93,25 @@ class Functor (Base t) => Foldable t where
   gpara :: (Unfoldable t, Comonad w) => (forall b. Base t (w b) -> w (Base t b)) -> (Base t (EnvT t w a) -> a) -> t -> a
   gpara t = gzygo embed t
 
+  -- | Fokkinga's prepromorphism
+  prepro 
+    :: Unfoldable t 
+    => (forall b. Base t b -> Base t b) 
+    -> (Base t a -> a) 
+    -> t 
+    -> a
+  prepro e f = c where c = f . fmap (c . cata (embed . e)) . project
+
+  --- | A generalized prepromorphism
+  gprepro 
+    :: (Unfoldable t, Comonad w) 
+    => (forall b. Base t (w b) -> w (Base t b)) 
+    -> (forall c. Base t c -> Base t c) 
+    -> (Base t (w a) -> a) 
+    -> t 
+    -> a
+  gprepro k e f = extract . c where c = fmap f . k . fmap (duplicate . c . cata (embed . e)) . project
+
 distPara :: Unfoldable t => Base t (t, a) -> (t, Base t a)
 distPara = distZygo embed
 
@@ -109,6 +128,25 @@ class Functor (Base t) => Unfoldable t where
 
   apo :: Foldable t => (a -> Base t (Either t a)) -> a -> t
   apo = gapo project
+
+  -- | Fokkinga's postpromorphism
+  postpro 
+    :: Foldable t
+    => (forall b. Base t b -> Base t b) -- natural transformation
+    -> (a -> Base t a)                  -- a (Base t)-coalgebra
+    -> a                                -- seed
+    -> t
+  postpro e g = a where a = embed . fmap (ana (e . project) . a) . g
+  
+  -- | A generalized postpromorphism
+  gpostpro 
+    :: (Foldable t, Monad m)
+    => (forall b. m (Base t b) -> Base t (m b)) -- distributive law
+    -> (forall c. Base t c -> Base t c)         -- natural transformation
+    -> (a -> Base t (m a))                      -- a (Base t)-m-coalgebra
+    -> a                                        -- seed
+    -> t
+  gpostpro k e g = a . return where a = embed . fmap (ana (e . project) . a . join) . k . liftM g
 
 hylo :: Functor f => (f b -> b) -> (a -> f a) -> a -> b
 hylo f g = h where h = f . fmap h . g
