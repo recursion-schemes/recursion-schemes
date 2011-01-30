@@ -34,6 +34,7 @@ module Data.Functor.Foldable
   , distZygo
   , distZygoT
   , distHisto
+  , distGHisto
   -- * Unfolding
   , Unfoldable(..)
   -- ** Combinators
@@ -57,6 +58,8 @@ module Data.Functor.Foldable
   -- * Elgot (co)algebras
   , elgot
   , coelgot
+  -- * Zygohistomorphic prepromorphisms
+  , zygoHistoPrepro
   ) where
 
 import Control.Applicative
@@ -378,13 +381,16 @@ distGApo f = either (fmap Left . f) (fmap Right)
 
 -- | Course-of-value iteration
 histo :: Foldable t => (Base t (Stream (Base t) a) -> a) -> t -> a
-histo = gfold (distHisto id)
+histo = gcata distHisto
 
 ghisto :: (Foldable t, Functor h) => (forall b. Base t (h b) -> h (Base t b)) -> (Base t (Stream h a) -> a) -> t -> a
-ghisto g = gfold (distHisto g)
+ghisto g = gcata (distGHisto g)
 
-distHisto :: (Functor f, Functor h) => (forall b. f (h b) -> h (f b)) -> f (Stream h a) -> Stream h (f a)
-distHisto k = Stream.unfold (\as -> (Stream.head <$> as, k (Stream.tail <$> as)))
+distHisto :: Functor f => f (Stream f a) -> Stream f (f a)
+distHisto = distGHisto id
+
+distGHisto :: (Functor f, Functor h) => (forall b. f (h b) -> h (f b)) -> f (Stream h a) -> Stream h (f a)
+distGHisto k = Stream.unfold (\as -> (Stream.head <$> as, k (Stream.tail <$> as)))
 
 -- TODO: futu & chrono, these require Free monads 
 -- TODO: distGApoT, requires EitherT
@@ -404,3 +410,15 @@ elgot phi psi = h where h = (id ||| phi . fmap h) . psi
 -- | Elgot coalgebras: <http://comonad.com/reader/2008/elgot-coalgebras/>
 coelgot :: Functor f => ((a, f b) -> b) -> (a -> f a) -> a -> b
 coelgot phi psi = h where h = phi . (id &&& fmap h . psi)
+
+-- | Zygohistomorphic prepromorphisms:
+-- 
+-- A corrected and modernized version of <http://www.haskell.org/haskellwiki/Zygohistomorphic_prepromorphisms>
+zygoHistoPrepro
+  :: (Unfoldable t, Foldable t) 
+  => (Base t b -> b)
+  -> (forall c. Base t c -> Base t c)
+  -> (Base t (EnvT b (Stream (Base t)) a) -> a)
+  -> t
+  -> a
+zygoHistoPrepro f = gprepro (distZygoT f distHisto)
