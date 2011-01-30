@@ -1,6 +1,6 @@
 name:          recursion-schemes
 category:      Control, Recursion
-version:       0.3.0
+version:       0.3.0.1
 license:       BSD3
 cabal-version: >= 1.6
 license-file:  LICENSE
@@ -16,6 +16,7 @@ description:
   /Changes since 0.2.2/:
   .
   * Split distHisto from distGHisto
+  .
   * Added zygohistomorphic prepromorphisms
   .
   /Changes since 0.2.1/:
