@@ -421,4 +421,4 @@ zygoHistoPrepro
   -> (Base t (EnvT b (Stream (Base t)) a) -> a)
   -> t
   -> a
-zygoHistoPrepro f = gprepro (distZygoT f distHisto)
+zygoHistoPrepro f g t = gprepro (distZygoT f distHisto) g t
