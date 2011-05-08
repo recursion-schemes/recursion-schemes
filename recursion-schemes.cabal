@@ -43,9 +43,9 @@ library
   build-depends: 
     base >= 4 && < 4.4,
     transformers >= 0.2.0 && < 0.3,
-    comonad >= 1.0.3 && < 1.1,
-    comonad-transformers >= 1.5.3 && < 1.6,
-    streams >= 0.6.3 && < 0.7
+    comonad >= 1.1 && < 1.2,
+    comonad-transformers >= 1.6.2 && < 1.7,
+    streams >= 0.7.0 && < 0.8
 
   exposed-modules:
     Data.Functor.Foldable
