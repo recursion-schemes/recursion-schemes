@@ -1,6 +1,6 @@
 name:          recursion-schemes
 category:      Control, Recursion
-version:       0.4.0.3
+version:       0.4.1
 license:       BSD3
 cabal-version: >= 1.6
 license-file:  LICENSE
@@ -43,9 +43,9 @@ library
   build-depends: 
     base >= 4 && < 4.4,
     transformers >= 0.2.0 && < 0.3,
-    comonad >= 1.0 && < 1.1,
-    comonad-transformers >= 1.0 && < 1.5,
-    streams >= 0.6 && < 0.7
+    comonad >= 1.0.3 && < 1.1,
+    comonad-transformers >= 1.5.3 && < 1.6,
+    streams >= 0.6.3 && < 0.7
 
   exposed-modules:
     Data.Functor.Foldable
