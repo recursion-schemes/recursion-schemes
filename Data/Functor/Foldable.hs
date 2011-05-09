@@ -27,6 +27,7 @@ module Data.Functor.Foldable
   , gzygo
   , histo
   , ghisto
+  , futu
   -- ** Distributive laws
   , distCata
   , distPara
@@ -35,6 +36,8 @@ module Data.Functor.Foldable
   , distZygoT
   , distHisto
   , distGHisto
+  , distFutu
+  , distGFutu
   -- * Unfolding
   , Unfoldable(..)
   -- ** Combinators
@@ -67,6 +70,7 @@ import Control.Comonad
 import Control.Comonad.Trans.Class
 import Control.Comonad.Trans.Env
 import Control.Monad (liftM, join)
+import Control.Monad.Free
 import Data.Functor.Identity
 import Control.Arrow
 import Data.Function (on)
@@ -235,6 +239,16 @@ grefold, ghylo
 ghylo w m f g = extract . h . return where 
   h = fmap f . w . fmap (duplicate . h . join) . m . liftM g
 grefold w m f g a = ghylo w m f g a
+
+futu :: Unfoldable t => (a -> Base t (Free (Base t) a)) -> a -> t 
+futu = gana distFutu
+
+distFutu :: Functor f => Free f (f a) -> f (Free f a)
+distFutu = distGFutu id
+
+distGFutu :: (Functor f, Functor h) => (forall b. h (f b) -> f (h b)) -> Free h (f a) -> f (Free h a)
+distGFutu _ (Pure fa) = Pure <$> fa 
+distGFutu k (Free as) = Free <$> k (distGFutu k <$> as)
 
 newtype Fix f = Fix (f (Fix f))
 

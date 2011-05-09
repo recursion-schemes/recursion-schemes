@@ -1,6 +1,6 @@
 name:          recursion-schemes
 category:      Control, Recursion
-version:       0.4.1
+version:       0.4.3
 license:       BSD3
 cabal-version: >= 1.6
 license-file:  LICENSE
@@ -13,6 +13,10 @@ synopsis:      Generalized bananas, lenses and barbed wire
 description:   
   Generalized bananas, lenses and barbed wire
   . 
+  /Changes since 0.4.2/:
+  .
+  * Added futumorphisms
+  .
   /Changes since 0.2.2/:
   .
   * Split distHisto from distGHisto
@@ -42,10 +46,11 @@ source-repository head
 library
   build-depends: 
     base >= 4 && < 4.4,
-    transformers >= 0.2.0 && < 0.3,
+    transformers >= 0.2 && < 0.3,
     comonad >= 1.1 && < 1.2,
     comonad-transformers >= 1.6.2 && < 1.7,
-    streams >= 0.7.0 && < 0.8
+    free >= 0.2 && < 0.3,
+    streams >= 0.7 && < 0.8
 
   exposed-modules:
     Data.Functor.Foldable
