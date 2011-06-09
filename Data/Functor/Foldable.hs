@@ -69,13 +69,13 @@ import Control.Applicative
 import Control.Comonad
 import Control.Comonad.Trans.Class
 import Control.Comonad.Trans.Env
+import qualified Control.Comonad.Trans.Cofree as Cofree
+import Control.Comonad.Trans.Cofree (Cofree(..))
 import Control.Monad (liftM, join)
-import Control.Monad.Free
+import Control.Monad.Trans.Free
 import Data.Functor.Identity
 import Control.Arrow
 import Data.Function (on)
-import qualified Data.Stream.Branching as Stream
-import Data.Stream.Branching (Stream(..))
 import Text.Read
 import Data.Data hiding (gunfold)
 import qualified Data.Data as Data
@@ -394,17 +394,17 @@ distGApo :: Functor f => (b -> f b) -> Either b (f a) -> f (Either b a)
 distGApo f = either (fmap Left . f) (fmap Right)
 
 -- | Course-of-value iteration
-histo :: Foldable t => (Base t (Stream (Base t) a) -> a) -> t -> a
+histo :: Foldable t => (Base t (Cofree (Base t) a) -> a) -> t -> a
 histo = gcata distHisto
 
-ghisto :: (Foldable t, Functor h) => (forall b. Base t (h b) -> h (Base t b)) -> (Base t (Stream h a) -> a) -> t -> a
+ghisto :: (Foldable t, Functor h) => (forall b. Base t (h b) -> h (Base t b)) -> (Base t (Cofree h a) -> a) -> t -> a
 ghisto g = gcata (distGHisto g)
 
-distHisto :: Functor f => f (Stream f a) -> Stream f (f a)
+distHisto :: Functor f => f (Cofree f a) -> Cofree f (f a)
 distHisto = distGHisto id
 
-distGHisto :: (Functor f, Functor h) => (forall b. f (h b) -> h (f b)) -> f (Stream h a) -> Stream h (f a)
-distGHisto k = Stream.unfold (\as -> (Stream.head <$> as, k (Stream.tail <$> as)))
+distGHisto :: (Functor f, Functor h) => (forall b. f (h b) -> h (f b)) -> f (Cofree h a) -> Cofree h (f a)
+distGHisto k = Cofree.unfold (\as -> (extract <$> as, k (Cofree.unwrap <$> as)))
 
 -- TODO: futu & chrono, these require Free monads 
 -- TODO: distGApoT, requires EitherT
@@ -432,7 +432,7 @@ zygoHistoPrepro
   :: (Unfoldable t, Foldable t) 
   => (Base t b -> b)
   -> (forall c. Base t c -> Base t c)
-  -> (Base t (EnvT b (Stream (Base t)) a) -> a)
+  -> (Base t (EnvT b (Cofree (Base t)) a) -> a)
   -> t
   -> a
 zygoHistoPrepro f g t = gprepro (distZygoT f distHisto) g t
