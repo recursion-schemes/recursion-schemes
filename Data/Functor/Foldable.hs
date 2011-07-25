@@ -69,10 +69,10 @@ import Control.Applicative
 import Control.Comonad
 import Control.Comonad.Trans.Class
 import Control.Comonad.Trans.Env
-import qualified Control.Comonad.Trans.Cofree as Cofree
-import Control.Comonad.Trans.Cofree (Cofree(..))
+import qualified Control.Comonad.Cofree as Cofree
+import Control.Comonad.Cofree (Cofree(..))
 import Control.Monad (liftM, join)
-import Control.Monad.Trans.Free
+import Control.Monad.Free
 import Data.Functor.Identity
 import Control.Arrow
 import Data.Function (on)
