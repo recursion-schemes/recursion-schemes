@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, TypeFamilies, Rank2Types, FlexibleContexts, FlexibleInstances, GADTs, StandaloneDeriving, UndecidableInstances, DeriveDataTypeable #-}
+{-# LANGUAGE CPP, TypeFamilies, Rank2Types, FlexibleContexts, FlexibleInstances, GADTs, StandaloneDeriving, UndecidableInstances #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Functor.Foldable
@@ -77,8 +77,10 @@ import Data.Functor.Identity
 import Control.Arrow
 import Data.Function (on)
 import Text.Read
+#ifdef __GLASGOW_HASKELL__
 import Data.Data hiding (gunfold)
 import qualified Data.Data as Data
+#endif
 
 type family Base t :: * -> *
 
