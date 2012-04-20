@@ -269,7 +269,11 @@ instance Typeable1 f => Typeable (Fix f) where
           asArgsTypeOf = const
   
 fixTyCon :: TyCon
+#if !MIN_VERSION_base(4,4,0)
 fixTyCon = mkTyCon "Data.Functor.Foldable.Fix"
+#else
+fixTyCon = mkTyCon3 "recursion-schemes" "Data.Functor.Foldable" "Fix"
+#endif
 {-# NOINLINE fixTyCon #-}
 
 instance (Typeable1 f, Data (f (Fix f))) => Data (Fix f) where

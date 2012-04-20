@@ -1,6 +1,6 @@
 name:          recursion-schemes
 category:      Control, Recursion
-version:       2.0
+version:       2.0.1
 license:       BSD3
 cabal-version: >= 1.6
 license-file:  LICENSE
@@ -12,31 +12,13 @@ copyright:     Copyright (C) 2008-2011 Edward A. Kmett
 synopsis:      Generalized bananas, lenses and barbed wire
 description:   
   Generalized bananas, lenses and barbed wire
-  . 
-  /Changes since 0.4.2/:
   .
-  * Added futumorphisms
+  /Changes since 2.0/:
   .
-  /Changes since 0.2.2/:
+  * Compatibility with transformers 0.3
   .
-  * Split distHisto from distGHisto
-  .
-  * Added zygohistomorphic prepromorphisms
-  .
-  /Changes since 0.2.1/:
-  .
-  * Added (generalized) prepro- and postpro- morphisms
-  .
-  /Changes since 0.2/:
-  .
-  * Added Elgot (co)algebras
-  .
-  /Changes since 0.1/:
-  .
-  * Removed dependency on Foldable from Mendler-style recursion schemes
-  .
-  * Added Lambek's Lemma
-  
+  * Resolved deprecation warnings caused by changes to Data.Typeable
+
 build-type:    Simple
 
 source-repository head
@@ -54,7 +36,7 @@ library
     StandaloneDeriving
     UndecidableInstances
 
-  build-depends: 
+  build-depends:
     base                 >= 4 && < 5,
     transformers         >= 0.2 && < 0.4,
     comonad              >= 1.1.1 && < 1.2,
@@ -64,4 +46,4 @@ library
   exposed-modules:
     Data.Functor.Foldable
 
-  ghc-options: -Wall 
+  ghc-options: -Wall
