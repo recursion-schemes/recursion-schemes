@@ -1,6 +1,6 @@
 name:          recursion-schemes
 category:      Control, Recursion
-version:       2.0.1
+version:       2.0.1.1
 license:       BSD3
 cabal-version: >= 1.6
 license-file:  LICENSE
@@ -37,11 +37,11 @@ library
     UndecidableInstances
 
   build-depends:
-    base                 >= 4 && < 5,
-    transformers         >= 0.2 && < 0.4,
-    comonad              >= 1.1.1 && < 1.2,
-    comonad-transformers >= 2.0 && < 2.2,
-    free                 >= 2.0 && < 2.2
+    base                 >= 4       && < 5,
+    transformers         >= 0.2     && < 0.4,
+    comonad              >= 1.1.1.5 && < 1.2,
+    comonad-transformers >= 2.1.1.1 && < 2.2,
+    free                 >= 2.1.1   && < 2.2
 
   exposed-modules:
     Data.Functor.Foldable
