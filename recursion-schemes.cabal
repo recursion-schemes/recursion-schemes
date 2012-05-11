@@ -1,6 +1,6 @@
 name:          recursion-schemes
 category:      Control, Recursion
-version:       2.0.1.1
+version:       2.0.1.2
 license:       BSD3
 cabal-version: >= 1.6
 license-file:  LICENSE
@@ -8,6 +8,7 @@ author:        Edward A. Kmett
 maintainer:    Edward A. Kmett <ekmett@gmail.com>
 stability:     provisional
 homepage:      http://github.com/ekmett/recursion-schemes/
+bug-reports:   http://github.com/ekmett/recursion-schemes/issues
 copyright:     Copyright (C) 2008-2011 Edward A. Kmett
 synopsis:      Generalized bananas, lenses and barbed wire
 description:   
@@ -20,6 +21,7 @@ description:
   * Resolved deprecation warnings caused by changes to Data.Typeable
 
 build-type:    Simple
+extra-source-files: .travis.yml
 
 source-repository head
   type: git
