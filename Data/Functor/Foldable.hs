@@ -267,12 +267,12 @@ instance Typeable1 f => Typeable (Fix f) where
   typeOf t = mkTyConApp fixTyCon [typeOf1 (undefined `asArgsTypeOf` t)]
     where asArgsTypeOf :: f a -> Fix f -> f a
           asArgsTypeOf = const
-  
+
 fixTyCon :: TyCon
-#if !MIN_VERSION_base(4,4,0)
-fixTyCon = mkTyCon "Data.Functor.Foldable.Fix"
-#else
+#if MIN_VERSION_base(4,4,0)
 fixTyCon = mkTyCon3 "recursion-schemes" "Data.Functor.Foldable" "Fix"
+#else
+fixTyCon = mkTyCon "Data.Functor.Foldable.Fix"
 #endif
 {-# NOINLINE fixTyCon #-}
 
