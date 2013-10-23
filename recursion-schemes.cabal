@@ -1,6 +1,6 @@
 name:          recursion-schemes
 category:      Control, Recursion
-version:       3.0.0.2
+version:       4.0
 license:       BSD3
 cabal-version: >= 1.6
 license-file:  LICENSE
@@ -11,14 +11,7 @@ homepage:      http://github.com/ekmett/recursion-schemes/
 bug-reports:   http://github.com/ekmett/recursion-schemes/issues
 copyright:     Copyright (C) 2008-2011 Edward A. Kmett
 synopsis:      Generalized bananas, lenses and barbed wire
-description:
-  Generalized bananas, lenses and barbed wire
-  .
-  /Changes since 2.0/:
-  .
-  * Compatibility with transformers 0.3
-  .
-  * Resolved deprecation warnings caused by changes to Data.Typeable
+description:   Generalized bananas, lenses and barbed wire
 
 build-type:    Simple
 extra-source-files: .travis.yml
@@ -40,10 +33,9 @@ library
 
   build-depends:
     base                 >= 4   && < 5,
-    transformers         >= 0.2 && < 1,
-    comonad              >= 3   && < 4,
-    comonad-transformers >= 3   && < 4,
-    free                 >= 3.2 && < 4
+    comonad              >= 4   && < 5,
+    free                 >= 4   && < 5,
+    transformers         >= 0.2 && < 1
 
   exposed-modules:
     Data.Functor.Foldable
