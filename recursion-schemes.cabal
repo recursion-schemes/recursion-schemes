@@ -14,7 +14,7 @@ synopsis:      Generalized bananas, lenses and barbed wire
 description:   Generalized bananas, lenses and barbed wire
 
 build-type:    Simple
-extra-source-files: .travis.yml
+extra-source-files: .travis.yml CHANGELOG.markdown
 
 source-repository head
   type: git
