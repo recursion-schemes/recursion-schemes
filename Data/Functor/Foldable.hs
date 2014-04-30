@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, TypeFamilies, Rank2Types, FlexibleContexts, FlexibleInstances, GADTs, StandaloneDeriving, UndecidableInstances #-}
+{-# LANGUAGE CPP, TypeFamilies, Rank2Types, FlexibleContexts, FlexibleInstances, GADTs, StandaloneDeriving, UndecidableInstances, DeriveDataTypeable #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Functor.Foldable
@@ -261,35 +261,8 @@ deriving instance Eq (f (Fix f)) => Eq (Fix f)
 deriving instance Ord (f (Fix f)) => Ord (Fix f)
 deriving instance Show (f (Fix f)) => Show (Fix f)
 deriving instance Read (f (Fix f)) => Read (Fix f)
-
-#ifdef __GLASGOW_HASKELL__
-instance Typeable1 f => Typeable (Fix f) where
-  typeOf t = mkTyConApp fixTyCon [typeOf1 (undefined `asArgsTypeOf` t)]
-    where asArgsTypeOf :: f a -> Fix f -> f a
-          asArgsTypeOf = const
-
-fixTyCon :: TyCon
-#if MIN_VERSION_base(4,4,0)
-fixTyCon = mkTyCon3 "recursion-schemes" "Data.Functor.Foldable" "Fix"
-#else
-fixTyCon = mkTyCon "Data.Functor.Foldable.Fix"
-#endif
-{-# NOINLINE fixTyCon #-}
-
-instance (Typeable1 f, Data (f (Fix f))) => Data (Fix f) where
-  gfoldl f z (Fix a) = z Fix `f` a
-  toConstr _ = fixConstr
-  gunfold k z c = case constrIndex c of
-    1 -> k (z (Fix))
-    _ -> error "gunfold"
-  dataTypeOf _ = fixDataType
-
-fixConstr :: Constr
-fixConstr = mkConstr fixDataType "Fix" [] Prefix
-
-fixDataType :: DataType
-fixDataType = mkDataType "Data.Functor.Foldable.Fix" [fixConstr]
-#endif
+deriving instance Typeable Fix
+deriving instance (Typeable f, Data (f (Fix f))) => Data (Fix f)
 
 type instance Base (Fix f) = f
 instance Functor f => Foldable (Fix f) where
