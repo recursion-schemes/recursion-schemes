@@ -27,6 +27,7 @@ module Data.Functor.Foldable
   -- * Folding
   , Foldable(..)
   -- ** Combinators
+  , gapo
   , gcata
   , zygo
   , gzygo
@@ -104,8 +105,8 @@ class Functor (Base t) => Foldable t where
        -> a               -- ^ result
   cata f = c where c = f . fmap c . project
 
-  para :: Unfoldable t => (Base t (t, a) -> a) -> t -> a
-  para t = zygo embed t
+  para :: (Base t (t, a) -> a) -> t -> a
+  para t = p where p x = t . fmap (((,) x) . p) $ project x
 
   gpara :: (Unfoldable t, Comonad w) => (forall b. Base t (w b) -> w (Base t b)) -> (Base t (EnvT t w a) -> a) -> t -> a
   gpara t = gzygo embed t
@@ -144,7 +145,7 @@ class Functor (Base t) => Unfoldable t where
   ana g = a where a = embed . fmap a . g
 
   apo :: Foldable t => (a -> Base t (Either t a)) -> a -> t
-  apo = gapo project
+  apo g = a where a = embed . (fmap (either id a)) . g
 
   -- | Fokkinga's postpromorphism
   postpro
