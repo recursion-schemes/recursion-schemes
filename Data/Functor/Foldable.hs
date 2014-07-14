@@ -106,7 +106,7 @@ class Functor (Base t) => Foldable t where
   cata f = c where c = f . fmap c . project
 
   para :: (Base t (t, a) -> a) -> t -> a
-  para t = p where p x = t . fmap (((,) x) . p) $ project x
+  para t = p where p x = t . fmap ((,) <*> p) $ project x
 
   gpara :: (Unfoldable t, Comonad w) => (forall b. Base t (w b) -> w (Base t b)) -> (Base t (EnvT t w a) -> a) -> t -> a
   gpara t = gzygo embed t
