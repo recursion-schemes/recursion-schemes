@@ -430,7 +430,6 @@ distHisto = distGHisto id
 distGHisto :: (Functor f, Functor h) => (forall b. f (h b) -> h (f b)) -> f (Cofree h a) -> Cofree h (f a)
 distGHisto k = Cofree.unfold (\as -> (extract <$> as, k (Cofree.unwrap <$> as)))
 
--- TODO: futu & chrono, these require Free monads
 -- TODO: distGApoT, requires EitherT
 
 chrono :: Functor f => (f (Cofree f b) -> b) -> (a -> f (Free f a)) -> (a -> b)
