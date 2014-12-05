@@ -34,6 +34,8 @@ module Data.Functor.Foldable
   , histo
   , ghisto
   , futu
+  , chrono
+  , gchrono
   -- ** Distributive laws
   , distCata
   , distPara
@@ -430,6 +432,16 @@ distGHisto k = Cofree.unfold (\as -> (extract <$> as, k (Cofree.unwrap <$> as)))
 
 -- TODO: futu & chrono, these require Free monads
 -- TODO: distGApoT, requires EitherT
+
+chrono :: Functor f => (f (Cofree f b) -> b) -> (a -> f (Free f a)) -> (a -> b)
+chrono = ghylo distHisto distFutu
+
+gchrono :: (Functor f, Functor w, Functor m) =>
+           (forall b. f (w b) -> w (f b)) ->
+           (forall b. m (f b) -> f (m b)) ->
+           (f (Cofree w b) -> b) -> (a -> f (Free m a)) ->
+           (a -> b)
+gchrono w m = ghylo (distGHisto w) (distGFutu m)
 
 -- | Mendler-style iteration
 mcata :: (forall y. (y -> c) -> f y -> c) -> Fix f -> c
