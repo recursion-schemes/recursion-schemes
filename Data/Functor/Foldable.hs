@@ -89,6 +89,9 @@ import Data.Data hiding (gunfold)
 #else
 import qualified Data.Data as Data
 #endif
+#if MIN_VERSION_base(4,8,0)
+import Prelude hiding (Foldable)
+#endif
 #endif
 
 type family Base t :: * -> *
