@@ -1,6 +1,6 @@
 name:          recursion-schemes
 category:      Control, Recursion
-version:       4.2
+version:       4.1.1
 license:       BSD3
 cabal-version: >= 1.6
 license-file:  LICENSE

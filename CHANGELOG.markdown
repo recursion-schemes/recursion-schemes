@@ -1,3 +1,7 @@
+## 4.1.1
+* Support for GHC 7.10
+* Fixed `para`.
+
 ## 4.1
 * Support for GHC 7.7+'s generalized `Typeable`.
 * Faster `gapo` and `para` by exploiting sharing.
