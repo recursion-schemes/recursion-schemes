@@ -1,3 +1,6 @@
+## 4.1.2
+* Support for `free` 4.12.1
+
 ## 4.1.1
 * Support for GHC 7.10
 * Fixed `para`.
