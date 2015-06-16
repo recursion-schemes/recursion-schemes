@@ -6,7 +6,6 @@
 #endif
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Data.Functor.Foldable
 -- Copyright   :  (C) 2008-2013 Edward Kmett
 -- License     :  BSD-style (see the file LICENSE)
 --
@@ -25,7 +24,7 @@ module Data.Functor.Foldable
   , Nu(..)
   , Prim(..)
   -- * Folding
-  , Foldable(..)
+  , Recursive(..)
   -- ** Combinators
   , gapo
   , gcata
@@ -45,7 +44,7 @@ module Data.Functor.Foldable
   , distFutu
   , distGFutu
   -- * Unfolding
-  , Unfoldable(..)
+  , Corecursive(..)
   -- ** Combinators
   , gana
   -- ** Distributive laws
@@ -100,7 +99,7 @@ data family Prim t :: * -> *
 -- type instance Base (Maybe a) = Const (Maybe a)
 -- type instance Base (Either a b) = Const (Either a b)
 
-class Functor (Base t) => Foldable t where
+class Functor (Base t) => Recursive t where
   project :: t -> Base t t
 
   cata :: (Base t a -> a) -- ^ a (Base t)-algebra
@@ -111,12 +110,12 @@ class Functor (Base t) => Foldable t where
   para :: (Base t (t, a) -> a) -> t -> a
   para t = p where p x = t . fmap ((,) <*> p) $ project x
 
-  gpara :: (Unfoldable t, Comonad w) => (forall b. Base t (w b) -> w (Base t b)) -> (Base t (EnvT t w a) -> a) -> t -> a
+  gpara :: (Corecursive t, Comonad w) => (forall b. Base t (w b) -> w (Base t b)) -> (Base t (EnvT t w a) -> a) -> t -> a
   gpara t = gzygo embed t
 
   -- | Fokkinga's prepromorphism
   prepro
-    :: Unfoldable t
+    :: Corecursive t
     => (forall b. Base t b -> Base t b)
     -> (Base t a -> a)
     -> t
@@ -125,7 +124,7 @@ class Functor (Base t) => Foldable t where
 
   --- | A generalized prepromorphism
   gprepro
-    :: (Unfoldable t, Comonad w)
+    :: (Corecursive t, Comonad w)
     => (forall b. Base t (w b) -> w (Base t b))
     -> (forall c. Base t c -> Base t c)
     -> (Base t (w a) -> a)
@@ -133,13 +132,13 @@ class Functor (Base t) => Foldable t where
     -> a
   gprepro k e f = extract . c where c = fmap f . k . fmap (duplicate . c . cata (embed . e)) . project
 
-distPara :: Unfoldable t => Base t (t, a) -> (t, Base t a)
+distPara :: Corecursive t => Base t (t, a) -> (t, Base t a)
 distPara = distZygo embed
 
-distParaT :: (Unfoldable t, Comonad w) => (forall b. Base t (w b) -> w (Base t b)) -> Base t (EnvT t w a) -> EnvT t w (Base t a)
+distParaT :: (Corecursive t, Comonad w) => (forall b. Base t (w b) -> w (Base t b)) -> Base t (EnvT t w a) -> EnvT t w (Base t a)
 distParaT t = distZygoT embed t
 
-class Functor (Base t) => Unfoldable t where
+class Functor (Base t) => Corecursive t where
   embed :: Base t t -> t
   ana
     :: (a -> Base t a) -- ^ a (Base t)-coalgebra
@@ -147,12 +146,12 @@ class Functor (Base t) => Unfoldable t where
     -> t               -- ^ resulting fixed point
   ana g = a where a = embed . fmap a . g
 
-  apo :: Foldable t => (a -> Base t (Either t a)) -> a -> t
+  apo :: Recursive t => (a -> Base t (Either t a)) -> a -> t
   apo g = a where a = embed . (fmap (either id a)) . g
 
   -- | Fokkinga's postpromorphism
   postpro
-    :: Foldable t
+    :: Recursive t
     => (forall b. Base t b -> Base t b) -- natural transformation
     -> (a -> Base t a)                  -- a (Base t)-coalgebra
     -> a                                -- seed
@@ -161,7 +160,7 @@ class Functor (Base t) => Unfoldable t where
 
   -- | A generalized postpromorphism
   gpostpro
-    :: (Foldable t, Monad m)
+    :: (Recursive t, Monad m)
     => (forall b. m (Base t b) -> Base t (m b)) -- distributive law
     -> (forall c. Base t c -> Base t c)         -- natural transformation
     -> (a -> Base t (m a))                      -- a (Base t)-m-coalgebra
@@ -172,10 +171,10 @@ class Functor (Base t) => Unfoldable t where
 hylo :: Functor f => (f b -> b) -> (a -> f a) -> a -> b
 hylo f g = h where h = f . fmap h . g
 
-fold :: Foldable t => (Base t a -> a) -> t -> a
+fold :: Recursive t => (Base t a -> a) -> t -> a
 fold = cata
 
-unfold :: Unfoldable t => (a -> Base t a) -> a -> t
+unfold :: Corecursive t => (a -> Base t a) -> a -> t
 unfold = ana
 
 refold :: Functor f => (f b -> b) -> (a -> f a) -> a -> b
@@ -187,14 +186,14 @@ instance Functor (Prim [a]) where
   fmap _ Nil = Nil
 
 type instance Base [a] = Prim [a]
-instance Foldable [a] where
+instance Recursive [a] where
   project (x:xs) = Cons x xs
   project [] = Nil
 
   para f (x:xs) = f (Cons x (xs, para f xs))
   para f [] = f Nil
 
-instance Unfoldable [a] where
+instance Corecursive [a] where
   embed (Cons x xs) = x:xs
   embed Nil = []
 
@@ -205,17 +204,17 @@ instance Unfoldable [a] where
 
 -- | Example boring stub for non-recursive data types
 type instance Base (Maybe a) = Const (Maybe a)
-instance Foldable (Maybe a) where project = Const
-instance Unfoldable (Maybe a) where embed = getConst
+instance Recursive (Maybe a) where project = Const
+instance Corecursive (Maybe a) where embed = getConst
 
 -- | Example boring stub for non-recursive data types
 type instance Base (Either a b) = Const (Either a b)
-instance Foldable (Either a b) where project = Const
-instance Unfoldable (Either a b) where embed = getConst
+instance Recursive (Either a b) where project = Const
+instance Corecursive (Either a b) where embed = getConst
 
 -- | A generalized catamorphism
 gfold, gcata
-  :: (Foldable t, Comonad w)
+  :: (Recursive t, Comonad w)
   => (forall b. Base t (w b) -> w (Base t b)) -- ^ a distributive law
   -> (Base t (w a) -> a)                      -- ^ a (Base t)-w-algebra
   -> t                                        -- ^ fixed point
@@ -229,7 +228,7 @@ distCata = Identity . fmap runIdentity
 
 -- | A generalized anamorphism
 gunfold, gana
-  :: (Unfoldable t, Monad m)
+  :: (Corecursive t, Monad m)
   => (forall b. m (Base t b) -> Base t (m b)) -- ^ a distributive law
   -> (a -> Base t (m a))                      -- ^ a (Base t)-m-coalgebra
   -> a                                        -- ^ seed
@@ -254,7 +253,7 @@ ghylo w m f g = extract . h . return where
   h = fmap f . w . fmap (duplicate . h . join) . m . liftM g
 grefold w m f g a = ghylo w m f g a
 
-futu :: Unfoldable t => (a -> Base t (Free (Base t) a)) -> a -> t
+futu :: Corecursive t => (a -> Base t (Free (Base t) a)) -> a -> t
 futu = gana distFutu
 
 distFutu :: Functor f => Free f (f a) -> f (Free f a)
@@ -311,34 +310,34 @@ fixDataType = mkDataType "Data.Functor.Foldable.Fix" [fixConstr]
 #endif
 
 type instance Base (Fix f) = f
-instance Functor f => Foldable (Fix f) where
+instance Functor f => Recursive (Fix f) where
   project (Fix a) = a
-instance Functor f => Unfoldable (Fix f) where
+instance Functor f => Corecursive (Fix f) where
   embed = Fix
 
-refix :: (Foldable s, Unfoldable t, Base s ~ Base t) => s -> t
+refix :: (Recursive s, Corecursive t, Base s ~ Base t) => s -> t
 refix = cata embed
 
-toFix :: Foldable t => t -> Fix (Base t)
+toFix :: Recursive t => t -> Fix (Base t)
 toFix = refix
 
-fromFix :: Unfoldable t => Fix (Base t) -> t
+fromFix :: Corecursive t => Fix (Base t) -> t
 fromFix = refix
 
 -- | Lambek's lemma provides a default definition for 'project' in terms of 'cata' and 'embed'
-lambek :: (Foldable t, Unfoldable t) => (t -> Base t t)
+lambek :: (Recursive t, Corecursive t) => (t -> Base t t)
 lambek = cata (fmap embed)
 
 -- | The dual of Lambek's lemma, provides a default definition for 'embed' in terms of 'ana' and 'project'
-colambek :: (Foldable t, Unfoldable t) => (Base t t -> t)
+colambek :: (Recursive t, Corecursive t) => (Base t t -> t)
 colambek = ana (fmap project)
 
 newtype Mu f = Mu (forall a. (f a -> a) -> a)
 type instance Base (Mu f) = f
-instance Functor f => Foldable (Mu f) where
+instance Functor f => Recursive (Mu f) where
   project = lambek
   cata f (Mu g) = g f
-instance Functor f => Unfoldable (Mu f) where
+instance Functor f => Corecursive (Mu f) where
   embed m = Mu (\f -> f (fmap (fold f) m))
 
 instance (Functor f, Eq (f (Fix f)), Eq (Fix f)) => Eq (Mu f) where
@@ -360,10 +359,10 @@ instance (Functor f, Read (f (Fix f)), Read (Fix f)) => Read (Mu f) where
 
 data Nu f where Nu :: (a -> f a) -> a -> Nu f
 type instance Base (Nu f) = f
-instance Functor f => Unfoldable (Nu f) where
+instance Functor f => Corecursive (Nu f) where
   embed = colambek
   ana = Nu
-instance Functor f => Foldable (Nu f) where
+instance Functor f => Recursive (Nu f) where
   project (Nu f a) = Nu f <$> f a
 
 instance (Functor f, Eq (f (Fix f)), Eq (Fix f)) => Eq (Nu f) where
@@ -383,7 +382,7 @@ instance (Functor f, Read (f (Fix f)), Read (Fix f)) => Read (Nu f) where
     fromFix <$> step readPrec
 #endif
 
-zygo :: Foldable t => (Base t b -> b) -> (Base t (b, a) -> a) -> t -> a
+zygo :: Recursive t => (Base t b -> b) -> (Base t (b, a) -> a) -> t -> a
 zygo f = gfold (distZygo f)
 
 distZygo
@@ -393,7 +392,7 @@ distZygo
 distZygo g m = (g (fmap fst m), fmap snd m)
 
 gzygo
-  :: (Foldable t, Comonad w)
+  :: (Recursive t, Comonad w)
   => (Base t b -> b)
   -> (forall c. Base t (w c) -> w (Base t c))
   -> (Base t (EnvT b w a) -> a)
@@ -409,20 +408,20 @@ distZygoT
 distZygoT g k fe = EnvT (g (getEnv <$> fe)) (k (lower <$> fe))
   where getEnv (EnvT e _) = e
 
-gapo :: Unfoldable t => (b -> Base t b) -> (a -> Base t (Either b a)) -> a -> t
+gapo :: Corecursive t => (b -> Base t b) -> (a -> Base t (Either b a)) -> a -> t
 gapo g = gunfold (distGApo g)
 
-distApo :: Foldable t => Either t (Base t a) -> Base t (Either t a)
+distApo :: Recursive t => Either t (Base t a) -> Base t (Either t a)
 distApo = distGApo project
 
 distGApo :: Functor f => (b -> f b) -> Either b (f a) -> f (Either b a)
 distGApo f = either (fmap Left . f) (fmap Right)
 
 -- | Course-of-value iteration
-histo :: Foldable t => (Base t (Cofree (Base t) a) -> a) -> t -> a
+histo :: Recursive t => (Base t (Cofree (Base t) a) -> a) -> t -> a
 histo = gcata distHisto
 
-ghisto :: (Foldable t, Functor h) => (forall b. Base t (h b) -> h (Base t b)) -> (Base t (Cofree h a) -> a) -> t -> a
+ghisto :: (Recursive t, Functor h) => (forall b. Base t (h b) -> h (Base t b)) -> (Base t (Cofree h a) -> a) -> t -> a
 ghisto g = gcata (distGHisto g)
 
 distHisto :: Functor f => f (Cofree f a) -> Cofree f (f a)
@@ -454,7 +453,7 @@ coelgot phi psi = h where h = phi . (id &&& fmap h . psi)
 --
 -- A corrected and modernized version of <http://www.haskell.org/haskellwiki/Zygohistomorphic_prepromorphisms>
 zygoHistoPrepro
-  :: (Unfoldable t, Foldable t)
+  :: (Corecursive t, Recursive t)
   => (Base t b -> b)
   -> (forall c. Base t c -> Base t c)
   -> (Base t (EnvT b (Cofree (Base t)) a) -> a)
