@@ -9,7 +9,7 @@ maintainer:    Edward A. Kmett <ekmett@gmail.com>
 stability:     provisional
 homepage:      http://github.com/ekmett/recursion-schemes/
 bug-reports:   http://github.com/ekmett/recursion-schemes/issues
-copyright:     Copyright (C) 2008-2013 Edward A. Kmett
+copyright:     Copyright (C) 2008-2015 Edward A. Kmett
 synopsis:      Generalized bananas, lenses and barbed wire
 description:   Generalized bananas, lenses and barbed wire
 
