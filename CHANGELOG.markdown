@@ -1,5 +1,6 @@
 ## 5
 * Renamed `Foldable` to `Recursive` and `Unfoldable` to `Corecursive`. With `Foldable` in `Prelude` in GHC 7.10+, having a needlessly conflicting name seemed silly.
+* Add support for GHC-8.0.1
 
 ## 4.1.2
 * Support for `free` 4.12.1

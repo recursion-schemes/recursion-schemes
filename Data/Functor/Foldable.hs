@@ -3,6 +3,9 @@
 #if MIN_VERSION_base(4,7,0)
 {-# LANGUAGE DeriveDataTypeable #-}
 #endif
+#if __GLASGOW_HASKELL__ >= 800
+{-# LANGUAGE ConstrainedClassMethods #-}
+#endif
 #endif
 -----------------------------------------------------------------------------
 -- |
