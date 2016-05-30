@@ -1,6 +1,7 @@
 ## 5
 * Renamed `Foldable` to `Recursive` and `Unfoldable` to `Corecursive`. With `Foldable` in `Prelude` in GHC 7.10+, having a needlessly conflicting name seemed silly.
 * Add support for GHC-8.0.1
+* Use `Eq1`, `Ord1`, `Show1`, `Read1` to derive `Fix`, `Nu` and `Mu` `Eq`, `Ord` `Show` and `Read` instances
 
 ## 4.1.2
 * Support for `free` 4.12.1

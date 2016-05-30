@@ -84,6 +84,7 @@ import Control.Monad.Free (Free(..))
 import Data.Functor.Identity
 import Control.Arrow
 import Data.Function (on)
+import Data.Functor.Classes
 import Text.Read
 #ifdef __GLASGOW_HASKELL__
 import Data.Data hiding (gunfold)
@@ -271,10 +272,22 @@ newtype Fix f = Fix (f (Fix f))
 unfix :: Fix f -> f (Fix f)
 unfix (Fix f) = f
 
-deriving instance Eq (f (Fix f)) => Eq (Fix f)
-deriving instance Ord (f (Fix f)) => Ord (Fix f)
-deriving instance Show (f (Fix f)) => Show (Fix f)
-deriving instance Read (f (Fix f)) => Read (Fix f)
+instance Eq1 f => Eq (Fix f) where
+  Fix a == Fix b = eq1 a b
+
+instance Ord1 f => Ord (Fix f) where
+  compare (Fix a) (Fix b) = compare1 a b
+
+instance Show1 f => Show (Fix f) where
+  showsPrec d (Fix a) =
+    showParen (d >= 11)
+      $ showString "Fix "
+      . showsPrec1 11 a
+
+instance Read1 f => Read (Fix f) where
+  readPrec = parens $ prec 10 $ do
+    Ident "Fix" <- lexP
+    Fix <$> step (readS_to_Prec readsPrec1)
 
 #ifdef __GLASGOW_HASKELL__
 #if MIN_VERSION_base(4,7,0)
@@ -343,18 +356,18 @@ instance Functor f => Recursive (Mu f) where
 instance Functor f => Corecursive (Mu f) where
   embed m = Mu (\f -> f (fmap (fold f) m))
 
-instance (Functor f, Eq (f (Fix f)), Eq (Fix f)) => Eq (Mu f) where
+instance (Functor f, Eq1 f) => Eq (Mu f) where
   (==) = (==) `on` toFix
 
-instance (Functor f, Ord (f (Fix f)), Ord (Fix f)) => Ord (Mu f) where
+instance (Functor f, Ord1 f) => Ord (Mu f) where
   compare = compare `on` toFix
 
-instance (Functor f, Show (f (Fix f)), Show (Fix f)) => Show (Mu f) where
+instance (Functor f, Show1 f) => Show (Mu f) where
   showsPrec d f = showParen (d > 10) $
     showString "fromFix " . showsPrec 11 (toFix f)
 
 #ifdef __GLASGOW_HASKELL__
-instance (Functor f, Read (f (Fix f)), Read (Fix f)) => Read (Mu f) where
+instance (Functor f, Read1 f) => Read (Mu f) where
   readPrec = parens $ prec 10 $ do
     Ident "fromFix" <- lexP
     fromFix <$> step readPrec
@@ -368,18 +381,18 @@ instance Functor f => Corecursive (Nu f) where
 instance Functor f => Recursive (Nu f) where
   project (Nu f a) = Nu f <$> f a
 
-instance (Functor f, Eq (f (Fix f)), Eq (Fix f)) => Eq (Nu f) where
+instance (Functor f, Eq1 f) => Eq (Nu f) where
   (==) = (==) `on` toFix
 
-instance (Functor f, Ord (f (Fix f)), Ord (Fix f)) => Ord (Nu f) where
+instance (Functor f, Ord1 f) => Ord (Nu f) where
   compare = compare `on` toFix
 
-instance (Functor f, Show (f (Fix f)), Show (Fix f)) => Show (Nu f) where
+instance (Functor f, Show1 f) => Show (Nu f) where
   showsPrec d f = showParen (d > 10) $
     showString "fromFix " . showsPrec 11 (toFix f)
 
 #ifdef __GLASGOW_HASKELL__
-instance (Functor f, Read (f (Fix f)), Read (Fix f)) => Read (Nu f) where
+instance (Functor f, Read1 f) => Read (Nu f) where
   readPrec = parens $ prec 10 $ do
     Ident "fromFix" <- lexP
     fromFix <$> step readPrec
