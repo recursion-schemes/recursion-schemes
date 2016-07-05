@@ -22,7 +22,7 @@ module Data.Functor.Foldable
   -- * Base functors for fixed points
     Base
   -- * Fixed points
-  , Fix(..)
+  , Fix(..), unfix
   , Mu(..)
   , Nu(..)
   , Prim(..)
