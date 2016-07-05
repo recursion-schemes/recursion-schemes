@@ -495,13 +495,29 @@ instance Ord2 f => Ord1 (Bifix f) where
 -- TODO: add instances for
 --   Show, Read,
 --   Show1, Read1
---   Typeable, Data
 
 type instance Base (Bifix f a) = Flip f a
 instance Bi.Bifunctor f => Recursive (Bifix f a) where
   project = Flip . unbifix
 instance Bi.Bifunctor f => Corecursive (Bifix f a) where
   embed = Bifix . runFlip
+
+#if __GLASGOW_HASKELL__
+#if HAS_POLY_TYPEABLE
+deriving instance Typeable Bifix
+deriving instance
+  ( Typeable (f :: * -> k -> *)
+  , Typeable a
+  , Typeable (Bifix :: (* -> k -> *) -> k -> *)
+  , Data (f (Bifix f a) a))
+  => Data (Bifix f a)
+#else
+-- TODO: Implement later
+#endif
+#endif
+
+-- todo add toBifix, fromBifix
+--
 
 -------------------------------------------------------------------------------
 -- Lambek
