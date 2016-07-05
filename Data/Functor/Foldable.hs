@@ -80,6 +80,9 @@ module Data.Functor.Foldable
   , ghylo
   -- ** Changing representation
   , refix
+  , refixWith
+  , toBifix
+  , fromBifix
   -- * Common names
   , fold, gfold
   , unfold, gunfold
@@ -533,8 +536,18 @@ deriving instance
 #endif
 #endif
 
--- todo add toBifix, fromBifix
+-- |
 --
+-- > refixWith (Flip . Flip) "foo" :: Bifix (Flip ListF) Char
+-- No instance for (Show2 (Flip ListF))
+refixWith :: (Recursive s, Corecursive t) => (Base s t -> Base t t) -> s -> t
+refixWith f = cata (embed . f)
+
+toBifix :: (Recursive s, Base s ~ f a, Bi.Bifunctor f) => s -> Bifix (Flip f) a
+toBifix = refixWith (Flip . Flip)
+
+fromBifix :: (Corecursive t, Base t ~ f a, Bi.Bifunctor f) => Bifix (Flip f) a -> t
+fromBifix = refixWith (runFlip . runFlip)
 
 -------------------------------------------------------------------------------
 -- Lambek
