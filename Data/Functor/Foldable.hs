@@ -1,12 +1,32 @@
 {-# LANGUAGE CPP, TypeFamilies, Rank2Types, FlexibleContexts, FlexibleInstances, GADTs, StandaloneDeriving, UndecidableInstances #-}
+
+-- explicit dictionary higher-kind instances are defined in
+-- - base-4.9
+-- - transformers >= 0.5
+-- - transformes-compat >= 0.5 when transformers aren't 0.4
+#define EXPLICIT_DICT_FUNCTOR_CLASSES (MIN_VERSION_base(4,9,0) || MIN_VERSION_transformers(0,5,0) || (MIN_VERSION_transformers_compat(0,5,0) && !MIN_VERSION_transformers(0,4,0)))
+
+#define HAS_GENERIC (__GLASGOW_HASKELL__ >= 702)
+#define HAS_GENERIC1 (__GLASGOW_HASKELL__ >= 706)
+
+-- Polymorphic typeable
+#define HAS_POLY_TYPEABLE MIN_VERSION_base(4,7,0)
+
 #ifdef __GLASGOW_HASKELL__
-#if MIN_VERSION_base(4,7,0)
 {-# LANGUAGE DeriveDataTypeable #-}
-#endif
 #if __GLASGOW_HASKELL__ >= 800
 {-# LANGUAGE ConstrainedClassMethods #-}
 #endif
+#if __GLASGOW_HASKELL__ >= 706
+{-# LANGUAGE PolyKinds #-}
 #endif
+#if HAS_GENERIC
+{-# LANGUAGE DeriveGeneric #-}
+#endif
+#endif
+
+
+
 -----------------------------------------------------------------------------
 -- |
 -- Copyright   :  (C) 2008-2015 Edward Kmett
@@ -21,11 +41,11 @@ module Data.Functor.Foldable
   (
   -- * Base functors for fixed points
     Base
+  , ListF(..)
   -- * Fixed points
   , Fix(..), unfix
   , Mu(..)
   , Nu(..)
-  , Prim(..)
   -- * Folding
   , Recursive(..)
   -- ** Combinators
@@ -88,11 +108,18 @@ import Control.Arrow
 import Data.Function (on)
 import Data.Functor.Classes
 import Text.Read
+import Text.Show
 #ifdef __GLASGOW_HASKELL__
 import Data.Data hiding (gunfold)
-#if MIN_VERSION_base(4,7,0)
+#if HAS_POLY_TYPEABLE
 #else
 import qualified Data.Data as Data
+#endif
+#if HAS_GENERIC
+import GHC.Generics (Generic)
+#endif
+#if HAS_GENERIC1
+import GHC.Generics (Generic1)
 #endif
 #endif
 
@@ -102,11 +129,11 @@ import Prelude
 import qualified Data.Foldable as F
 import qualified Data.Traversable as T
 
-type family Base t :: * -> *
+import qualified Data.Bifunctor as Bi
+import qualified Data.Bifoldable as Bi
+import qualified Data.Bitraversable as Bi
 
-data family Prim t :: * -> *
--- type instance Base (Maybe a) = Const (Maybe a)
--- type instance Base (Either a b) = Const (Either a b)
+type family Base t :: * -> *
 
 class Functor (Base t) => Recursive t where
   project :: t -> Base t t
@@ -189,22 +216,94 @@ unfold = ana
 refold :: Functor f => (f b -> b) -> (a -> f a) -> a -> b
 refold = hylo
 
-data instance Prim [a] b = Nil | Cons a b deriving (Eq,Ord,Show,Read)
+-- | Base functor of @[]@.
+data ListF a b = Nil | Cons a b
+  deriving (Eq,Ord,Show,Read,Typeable
+#if HAS_GENERIC
+          , Generic
+#endif
+#if HAS_GENERIC1
+          , Generic1
+#endif
+          )
+
+#if EXPLICIT_DICT_FUNCTOR_CLASSES
+instance Eq2 ListF where
+  liftEq2 _ _ Nil        Nil          = True
+  liftEq2 f g (Cons a b) (Cons a' b') = f a a' && g b b'
+  liftEq2 _ _ _          _            = False
+
+instance Eq a => Eq1 (ListF a) where
+  liftEq = liftEq2 (==)
+
+instance Ord2 ListF where
+  liftCompare2 _ _ Nil        Nil          = EQ
+  liftCompare2 _ _ Nil        _            = LT
+  liftCompare2 _ _ _          Nil          = GT
+  liftCompare2 f g (Cons a b) (Cons a' b') = f a a' `mappend` g b b'
+
+instance Ord a => Ord1 (ListF a) where
+  liftCompare = liftCompare2 compare
+
+instance Show a => Show1 (ListF a) where
+  liftShowsPrec = liftShowsPrec2 showsPrec showList
+
+instance Show2 ListF where
+  liftShowsPrec2 _  _ _  _ _ Nil        = showString "Nil"
+  liftShowsPrec2 sa _ sb _ d (Cons a b) = showParen (d > 10)
+    $ showString "Cons "
+    . sa 11 a
+    . showString " "
+    . sb 11 b
+
+instance Read2 ListF where
+  liftReadsPrec2 ra _ rb _ d = readParen (d > 10) $ \s -> nil s ++ cons s
+    where
+      nil s0 = do
+        ("Nil", s1) <- lex s0
+        return (Nil, s1)
+      cons s0 = do
+        ("Cons", s1) <- lex s0
+        (a,      s2) <- ra 11 s1
+        (b,      s3) <- rb 11 s2
+        return (Cons a b, s3)
+
+instance Read a => Read1 (ListF a) where
+  liftReadsPrec = liftReadsPrec2 readsPrec readList
+
+#else
+instance Eq a   => Eq1   (ListF a) where eq1        = (==)
+instance Ord a  => Ord1  (ListF a) where compare1   = compare
+instance Show a => Show1 (ListF a) where showsPrec1 = showsPrec
+instance Read a => Read1 (ListF a) where readsPrec1 = readsPrec
+#endif
 
 -- These instances cannot be auto-derived on with GHC <= 7.6
-instance Functor (Prim [a]) where
+instance Functor (ListF a) where
   fmap _ Nil        = Nil
   fmap f (Cons a b) = Cons a (f b)
 
-instance F.Foldable (Prim [a]) where
-  foldMap _ Nil        = mempty
+instance F.Foldable (ListF a) where
+  foldMap _ Nil        = Data.Monoid.mempty
   foldMap f (Cons _ b) = f b
 
-instance T.Traversable (Prim [a]) where
+instance T.Traversable (ListF a) where
   traverse _ Nil        = pure Nil
   traverse f (Cons a b) = Cons a <$> f b
 
-type instance Base [a] = Prim [a]
+instance Bi.Bifunctor ListF where
+  bimap _ _ Nil        = Nil
+  bimap f g (Cons a b) = Cons (f a) (g b)
+
+instance Bi.Bifoldable ListF where
+  bifoldMap _ _ Nil        = mempty
+  bifoldMap f g (Cons a b) = mappend (f a) (g b)
+
+instance Bi.Bitraversable ListF where
+  bitraverse _ _ Nil        = pure Nil
+  bitraverse f g (Cons a b) = Cons <$> f a <*> g b
+
+type instance Base [a] = ListF a
 instance Recursive [a] where
   project (x:xs) = Cons x xs
   project [] = Nil
@@ -282,6 +381,10 @@ distGFutu :: (Functor f, Functor h) => (forall b. h (f b) -> f (h b)) -> Free h 
 distGFutu _ (Pure fa) = Pure <$> fa
 distGFutu k (Free as) = Free <$> k (distGFutu k <$> as)
 
+-------------------------------------------------------------------------------
+-- Fix
+-------------------------------------------------------------------------------
+
 newtype Fix f = Fix (f (Fix f))
 
 unfix :: Fix f -> f (Fix f)
@@ -305,8 +408,9 @@ instance Read1 f => Read (Fix f) where
     Fix <$> step (readS_to_Prec readsPrec1)
 
 #ifdef __GLASGOW_HASKELL__
-#if MIN_VERSION_base(4,7,0)
+#if HAS_POLY_TYPEABLE
 deriving instance Typeable Fix
+deriving instance (Typeable f, Data (f (Fix f))) => Data (Fix f)
 #else
 instance Typeable1 f => Typeable (Fix f) where
    typeOf t = mkTyConApp fixTyCon [typeOf1 (undefined `asArgsTypeOf` t)]
@@ -314,9 +418,6 @@ instance Typeable1 f => Typeable (Fix f) where
            asArgsTypeOf = const
 
 fixTyCon :: TyCon
-#endif
-#if MIN_VERSION_base(4,7,0)
-#else
 #if MIN_VERSION_base(4,4,0)
 fixTyCon = mkTyCon3 "recursion-schemes" "Data.Functor.Foldable" "Fix"
 #else
@@ -354,6 +455,10 @@ toFix = refix
 
 fromFix :: Corecursive t => Fix (Base t) -> t
 fromFix = refix
+
+-------------------------------------------------------------------------------
+-- Lambek
+-------------------------------------------------------------------------------
 
 -- | Lambek's lemma provides a default definition for 'project' in terms of 'cata' and 'embed'
 lambek :: (Recursive t, Corecursive t) => (t -> Base t t)
@@ -500,3 +605,18 @@ zygoHistoPrepro
   -> t
   -> a
 zygoHistoPrepro f g t = gprepro (distZygoT f distHisto) g t
+
+-------------------------------------------------------------------------------
+-- Not exposed anywhere
+-------------------------------------------------------------------------------
+
+-- | Read a list (using square brackets and commas), given a function
+-- for reading elements.
+_readListWith :: ReadS a -> ReadS [a]
+_readListWith rp =
+    readParen False (\r -> [pr | ("[",s) <- lex r, pr <- readl s])
+  where
+    readl s = [([],t) | ("]",t) <- lex s] ++
+        [(x:xs,u) | (x,t) <- rp s, (xs,u) <- readl' t]
+    readl' s = [([],t) | ("]",t) <- lex s] ++
+        [(x:xs,v) | (",",t) <- lex s, (x,u) <- rp t, (xs,v) <- readl' u]
