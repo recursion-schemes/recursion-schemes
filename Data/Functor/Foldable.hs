@@ -44,6 +44,7 @@ module Data.Functor.Foldable
   , ListF(..)
   -- * Fixed points
   , Fix(..), unfix
+  , Bifix(..), unbifix
   , Mu(..)
   , Nu(..)
   -- * Folding
@@ -132,6 +133,8 @@ import qualified Data.Traversable as T
 import qualified Data.Bifunctor as Bi
 import qualified Data.Bifoldable as Bi
 import qualified Data.Bitraversable as Bi
+
+import Data.Bifunctor.Flip (Flip (..))
 
 type family Base t :: * -> *
 
@@ -277,6 +280,9 @@ instance Ord a  => Ord1  (ListF a) where compare1   = compare
 instance Show a => Show1 (ListF a) where showsPrec1 = showsPrec
 instance Read a => Read1 (ListF a) where readsPrec1 = readsPrec
 #endif
+
+-- TODO: add instances for Eq1/2, Ord1/2, Show1/2, Read1/2
+-- Typeable, Typeable1, Generic
 
 -- These instances cannot be auto-derived on with GHC <= 7.6
 instance Functor (ListF a) where
@@ -455,6 +461,38 @@ toFix = refix
 
 fromFix :: Corecursive t => Fix (Base t) -> t
 fromFix = refix
+
+-------------------------------------------------------------------------------
+-- Bifix
+-------------------------------------------------------------------------------
+
+-- | Recurse over the first parameter of a 'Bi.Bifunctor'
+--
+-- Starting with GHC 7.6 'Bifix' is polykinded: @'Bifix' :: (* -> k -> *) -> k -> *@.
+newtype Bifix f a = Bifix (f (Bifix f a) a)
+
+unbifix :: Bifix f a -> f (Bifix f a) a
+unbifix (Bifix f) = f
+
+instance Bi.Bifunctor f => Functor (Bifix f) where
+  fmap f = go where go (Bifix x) = Bifix (Bi.bimap go f x)
+
+instance Bi.Bifoldable f => F.Foldable (Bifix f) where
+  foldMap f = go where go (Bifix x) = Bi.bifoldMap go f x
+
+instance Bi.Bitraversable f => T.Traversable (Bifix f) where
+  traverse f = go where go (Bifix x) = Bifix <$> Bi.bitraverse go f x
+
+-- TODO: add instances for
+--   Eq, Ord, Show, Read,
+--   Eq1, Ord1, Show1, Read1
+--   Typeable, Data
+
+type instance Base (Bifix f a) = Flip f a
+instance Bi.Bifunctor f => Recursive (Bifix f a) where
+  project = Flip . unbifix
+instance Bi.Bifunctor f => Corecursive (Bifix f a) where
+  embed = Bifix . runFlip
 
 -------------------------------------------------------------------------------
 -- Lambek
