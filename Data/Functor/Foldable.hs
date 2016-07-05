@@ -454,8 +454,8 @@ chrono :: Functor f => (f (Cofree f b) -> b) -> (a -> f (Free f a)) -> (a -> b)
 chrono = ghylo distHisto distFutu
 
 gchrono :: (Functor f, Functor w, Functor m) =>
-           (forall b. f (w b) -> w (f b)) ->
-           (forall b. m (f b) -> f (m b)) ->
+           (forall c. f (w c) -> w (f c)) ->
+           (forall c. m (f c) -> f (m c)) ->
            (f (Cofree w b) -> b) -> (a -> f (Free m a)) ->
            (a -> b)
 gchrono w m = ghylo (distGHisto w) (distGFutu m)
