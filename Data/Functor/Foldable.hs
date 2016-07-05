@@ -25,8 +25,6 @@
 #endif
 #endif
 
-
-
 -----------------------------------------------------------------------------
 -- |
 -- Copyright   :  (C) 2008-2015 Edward Kmett
@@ -281,9 +279,6 @@ instance Show a => Show1 (ListF a) where showsPrec1 = showsPrec
 instance Read a => Read1 (ListF a) where readsPrec1 = readsPrec
 #endif
 
--- TODO: add instances for Eq1/2, Ord1/2, Show1/2, Read1/2
--- Typeable, Typeable1, Generic
-
 -- These instances cannot be auto-derived on with GHC <= 7.6
 instance Functor (ListF a) where
   fmap _ Nil        = Nil
@@ -483,9 +478,23 @@ instance Bi.Bifoldable f => F.Foldable (Bifix f) where
 instance Bi.Bitraversable f => T.Traversable (Bifix f) where
   traverse f = go where go (Bifix x) = Bifix <$> Bi.bitraverse go f x
 
+#if EXPLICIT_DICT_FUNCTOR_CLASSES
+-- | Cannot write this instances, as transformes-0.4 doesn't have *2 classes.
+instance (Eq2 f, Eq a) => Eq (Bifix f a) where
+  (==) = eq1
+instance (Ord2 f, Ord a) => Ord (Bifix f a) where
+  compare = compare1
+
+instance Eq2 f => Eq1 (Bifix f) where
+  liftEq eq = go where go (Bifix a) (Bifix b) = liftEq2 go eq a b
+instance Ord2 f => Ord1 (Bifix f) where
+  liftCompare cmp = go where
+    go (Bifix a) (Bifix b) = liftCompare2 go cmp a b
+#endif
+
 -- TODO: add instances for
---   Eq, Ord, Show, Read,
---   Eq1, Ord1, Show1, Read1
+--   Show, Read,
+--   Show1, Read1
 --   Typeable, Data
 
 type instance Base (Bifix f a) = Flip f a
