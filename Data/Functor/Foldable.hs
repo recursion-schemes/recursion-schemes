@@ -94,10 +94,13 @@ import Data.Data hiding (gunfold)
 #else
 import qualified Data.Data as Data
 #endif
-#if MIN_VERSION_base(4,8,0)
-import Prelude hiding (Foldable)
 #endif
-#endif
+
+import Data.Monoid (Monoid (..))
+import Prelude
+
+import qualified Data.Foldable as F
+import qualified Data.Traversable as T
 
 type family Base t :: * -> *
 
@@ -152,7 +155,7 @@ class Functor (Base t) => Corecursive t where
     -> t               -- ^ resulting fixed point
   ana g = a where a = embed . fmap a . g
 
-  apo :: Recursive t => (a -> Base t (Either t a)) -> a -> t
+  apo :: (a -> Base t (Either t a)) -> a -> t
   apo g = a where a = embed . (fmap (either id a)) . g
 
   -- | Fokkinga's postpromorphism
@@ -186,10 +189,20 @@ unfold = ana
 refold :: Functor f => (f b -> b) -> (a -> f a) -> a -> b
 refold = hylo
 
-data instance Prim [a] b = Cons a b | Nil deriving (Eq,Ord,Show,Read)
+data instance Prim [a] b = Nil | Cons a b deriving (Eq,Ord,Show,Read)
+
+-- These instances cannot be auto-derived on with GHC <= 7.6
 instance Functor (Prim [a]) where
+  fmap _ Nil        = Nil
   fmap f (Cons a b) = Cons a (f b)
-  fmap _ Nil = Nil
+
+instance F.Foldable (Prim [a]) where
+  foldMap _ Nil        = mempty
+  foldMap f (Cons _ b) = f b
+
+instance T.Traversable (Prim [a]) where
+  traverse _ Nil        = pure Nil
+  traverse f (Cons a b) = Cons a <$> f b
 
 type instance Base [a] = Prim [a]
 instance Recursive [a] where
@@ -454,8 +467,8 @@ chrono :: Functor f => (f (Cofree f b) -> b) -> (a -> f (Free f a)) -> (a -> b)
 chrono = ghylo distHisto distFutu
 
 gchrono :: (Functor f, Functor w, Functor m) =>
-           (forall b. f (w b) -> w (f b)) ->
-           (forall b. m (f b) -> f (m b)) ->
+           (forall c. f (w c) -> w (f c)) ->
+           (forall c. m (f c) -> f (m c)) ->
            (f (Cofree w b) -> b) -> (a -> f (Free m a)) ->
            (a -> b)
 gchrono w m = ghylo (distGHisto w) (distGFutu m)

@@ -1,4 +1,6 @@
 dist/
+dist-newstyle/
+.stack-work/
 .hsenv/
 docs
 wiki
@@ -15,3 +17,5 @@ wip
 .cabal-sandbox/
 cabal.sandbox.config
 codex.tags
+src/highlight.js
+src/style.css
