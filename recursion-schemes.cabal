@@ -2,7 +2,7 @@ name:          recursion-schemes
 category:      Control, Recursion
 version:       5
 license:       BSD3
-cabal-version: >= 1.6
+cabal-version: >= 1.8
 license-file:  LICENSE
 author:        Edward A. Kmett
 maintainer:    Edward A. Kmett <ekmett@gmail.com>
@@ -21,6 +21,11 @@ extra-source-files: .travis.yml CHANGELOG.markdown .gitignore README.markdown
 source-repository head
   type: git
   location: git://github.com/ekmett/recursion-schemes.git
+
+flag template-haskell
+  description: About Template Haskell derivations
+  manual: True
+  default: True
 
 library
   extensions: CPP
@@ -49,4 +54,18 @@ library
     Data.Functor.Base
     Data.Functor.Foldable
 
+  if flag(template-haskell)
+    build-depends: template-haskell >= 2.5.0.0 && <2.12
+    exposed-modules:
+      Data.Functor.Foldable.TH
+
   ghc-options: -Wall
+
+test-suite Expr
+  type: exitcode-stdio-1.0
+  main-is: Expr.hs
+  hs-source-dirs: examples
+  ghc-options: -Wall -threaded
+  build-depends:
+    base,
+    recursion-schemes
