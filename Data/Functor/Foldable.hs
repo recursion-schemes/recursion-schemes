@@ -152,7 +152,7 @@ class Functor (Base t) => Corecursive t where
     -> t               -- ^ resulting fixed point
   ana g = a where a = embed . fmap a . g
 
-  apo :: Recursive t => (a -> Base t (Either t a)) -> a -> t
+  apo :: (a -> Base t (Either t a)) -> a -> t
   apo g = a where a = embed . (fmap (either id a)) . g
 
   -- | Fokkinga's postpromorphism
