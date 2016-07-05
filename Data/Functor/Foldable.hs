@@ -94,10 +94,13 @@ import Data.Data hiding (gunfold)
 #else
 import qualified Data.Data as Data
 #endif
-#if MIN_VERSION_base(4,8,0)
-import Prelude hiding (Foldable)
 #endif
-#endif
+
+import Data.Monoid (Monoid (..))
+import Prelude
+
+import qualified Data.Foldable as F
+import qualified Data.Traversable as T
 
 type family Base t :: * -> *
 
@@ -187,9 +190,19 @@ refold :: Functor f => (f b -> b) -> (a -> f a) -> a -> b
 refold = hylo
 
 data instance Prim [a] b = Nil | Cons a b deriving (Eq,Ord,Show,Read)
+
+-- These instances cannot be auto-derived on with GHC <= 7.6
 instance Functor (Prim [a]) where
+  fmap _ Nil        = Nil
   fmap f (Cons a b) = Cons a (f b)
-  fmap _ Nil = Nil
+
+instance F.Foldable (Prim [a]) where
+  foldMap _ Nil        = mempty
+  foldMap f (Cons _ b) = f b
+
+instance T.Traversable (Prim [a]) where
+  traverse _ Nil        = pure Nil
+  traverse f (Cons a b) = Cons a <$> f b
 
 type instance Base [a] = Prim [a]
 instance Recursive [a] where
