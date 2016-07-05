@@ -479,22 +479,39 @@ instance Bi.Bitraversable f => T.Traversable (Bifix f) where
   traverse f = go where go (Bifix x) = Bifix <$> Bi.bitraverse go f x
 
 #if EXPLICIT_DICT_FUNCTOR_CLASSES
--- | Cannot write this instances, as transformes-0.4 doesn't have *2 classes.
-instance (Eq2 f, Eq a) => Eq (Bifix f a) where
-  (==) = eq1
-instance (Ord2 f, Ord a) => Ord (Bifix f a) where
-  compare = compare1
+instance (Eq2 f,   Eq a)   => Eq   (Bifix f a) where (==)      = eq1
+instance (Ord2 f,  Ord a)  => Ord  (Bifix f a) where compare   = compare1
+instance (Show2 f, Show a) => Show (Bifix f a) where showsPrec = showsPrec1
+instance (Read2 f, Read a) => Read (Bifix f a) where readsPrec = readsPrec1
 
 instance Eq2 f => Eq1 (Bifix f) where
   liftEq eq = go where go (Bifix a) (Bifix b) = liftEq2 go eq a b
+
 instance Ord2 f => Ord1 (Bifix f) where
   liftCompare cmp = go where
     go (Bifix a) (Bifix b) = liftCompare2 go cmp a b
-#endif
 
--- TODO: add instances for
---   Show, Read,
---   Show1, Read1
+-- > Bifix (Right 'a' :: Either (Bifix Either Char) Char)
+-- Bifix (Right 'a')
+instance Show2 f => Show1 (Bifix f) where
+  liftShowsPrec s sl = go where
+    goList = showListWith (go 0)
+    go d (Bifix x) = showParen (d > 10)
+      $ showString "Bifix "
+      . liftShowsPrec2 go goList s sl 11 x
+
+-- > read "Bifix (Right 'a')" :: Bifix Either Char
+-- Bifix (Right 'a')
+instance Read2 f => Read1 (Bifix f) where
+  liftReadsPrec r rl = go where
+    goList = _readListWith (go 0)
+    go d = readParen (d > 10) $ \s0 -> do
+      ("Bifix", s1) <-lex s0
+      (x,       s2) <- liftReadsPrec2 go goList r rl 11 s1
+      return (Bifix x, s2)
+
+-- Cannot write this instances, as transformes-0.4 doesn't have *2 classes.
+#endif
 
 type instance Base (Bifix f a) = Flip f a
 instance Bi.Bifunctor f => Recursive (Bifix f a) where
