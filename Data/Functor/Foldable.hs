@@ -186,7 +186,7 @@ unfold = ana
 refold :: Functor f => (f b -> b) -> (a -> f a) -> a -> b
 refold = hylo
 
-data instance Prim [a] b = Cons a b | Nil deriving (Eq,Ord,Show,Read)
+data instance Prim [a] b = Nil | Cons a b deriving (Eq,Ord,Show,Read)
 instance Functor (Prim [a]) where
   fmap f (Cons a b) = Cons a (f b)
   fmap _ Nil = Nil
