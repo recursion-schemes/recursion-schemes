@@ -73,6 +73,7 @@ module Data.Functor.Foldable
   , distAna
   , distApo
   , distGApo
+  , distGApoT
   -- * Refolding
   , hylo
   , ghylo
@@ -100,6 +101,7 @@ import qualified Control.Comonad.Cofree as Cofree
 import Control.Comonad.Cofree (Cofree(..))
 import Control.Monad (liftM, join)
 import Control.Monad.Free (Free(..))
+import Control.Monad.Trans.Except (ExceptT(..), runExceptT)
 import Data.Functor.Identity
 import Control.Arrow
 import Data.Function (on)
@@ -550,6 +552,14 @@ distApo = distGApo project
 distGApo :: Functor f => (b -> f b) -> Either b (f a) -> f (Either b a)
 distGApo f = either (fmap Left . f) (fmap Right)
 
+distGApoT
+  :: (Functor f, Functor m)
+  => (b -> f b)
+  -> (forall c. m (f c) -> f (m c))
+  -> ExceptT b m (f a)
+  -> f (ExceptT b m a)
+distGApoT g k = fmap ExceptT . k . fmap (distGApo g) . runExceptT
+
 -- | Course-of-value iteration
 histo :: Recursive t => (Base t (Cofree (Base t) a) -> a) -> t -> a
 histo = gcata distHisto
@@ -562,8 +572,6 @@ distHisto = distGHisto id
 
 distGHisto :: (Functor f, Functor h) => (forall b. f (h b) -> h (f b)) -> f (Cofree h a) -> Cofree h (f a)
 distGHisto k = Cofree.unfold (\as -> (extract <$> as, k (Cofree.unwrap <$> as)))
-
--- TODO: distGApoT, requires EitherT
 
 chrono :: Functor f => (f (Cofree f b) -> b) -> (a -> f (Free f a)) -> (a -> b)
 chrono = ghylo distHisto distFutu
