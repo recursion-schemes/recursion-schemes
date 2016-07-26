@@ -22,8 +22,6 @@
 #endif
 #endif
 
-
-
 -----------------------------------------------------------------------------
 -- |
 -- Copyright   :  (C) 2008-2015 Edward Kmett
@@ -41,6 +39,7 @@ module Data.Functor.Foldable
   , ListF(..)
   -- * Fixed points
   , Fix(..), unfix
+  , Bifix(..), unbifix
   , Mu(..)
   , Nu(..)
   -- * Folding
@@ -79,6 +78,9 @@ module Data.Functor.Foldable
   , ghylo
   -- ** Changing representation
   , refix
+  , refixWith
+  , toBifix
+  , fromBifix
   -- * Common names
   , fold, gfold
   , unfold, gunfold
@@ -131,6 +133,8 @@ import qualified Data.Traversable as T
 import qualified Data.Bifunctor as Bi
 import qualified Data.Bifoldable as Bi
 import qualified Data.Bitraversable as Bi
+
+import Data.Bifunctor.Flip (Flip (..))
 
 type family Base t :: * -> *
 
@@ -454,6 +458,95 @@ toFix = refix
 
 fromFix :: Corecursive t => Fix (Base t) -> t
 fromFix = refix
+
+-------------------------------------------------------------------------------
+-- Bifix
+-------------------------------------------------------------------------------
+
+-- | Recurse over the first parameter of a 'Bi.Bifunctor'
+--
+-- Starting with GHC 7.6 'Bifix' is polykinded: @'Bifix' :: (* -> k -> *) -> k -> *@.
+newtype Bifix f a = Bifix (f (Bifix f a) a)
+
+unbifix :: Bifix f a -> f (Bifix f a) a
+unbifix (Bifix f) = f
+
+instance Bi.Bifunctor f => Functor (Bifix f) where
+  fmap f = go where go (Bifix x) = Bifix (Bi.bimap go f x)
+
+instance Bi.Bifoldable f => F.Foldable (Bifix f) where
+  foldMap f = go where go (Bifix x) = Bi.bifoldMap go f x
+
+instance Bi.Bitraversable f => T.Traversable (Bifix f) where
+  traverse f = go where go (Bifix x) = Bifix <$> Bi.bitraverse go f x
+
+#if EXPLICIT_DICT_FUNCTOR_CLASSES
+instance (Eq2 f,   Eq a)   => Eq   (Bifix f a) where (==)      = eq1
+instance (Ord2 f,  Ord a)  => Ord  (Bifix f a) where compare   = compare1
+instance (Show2 f, Show a) => Show (Bifix f a) where showsPrec = showsPrec1
+instance (Read2 f, Read a) => Read (Bifix f a) where readsPrec = readsPrec1
+
+instance Eq2 f => Eq1 (Bifix f) where
+  liftEq eq = go where go (Bifix a) (Bifix b) = liftEq2 go eq a b
+
+instance Ord2 f => Ord1 (Bifix f) where
+  liftCompare cmp = go where
+    go (Bifix a) (Bifix b) = liftCompare2 go cmp a b
+
+-- > Bifix (Right 'a' :: Either (Bifix Either Char) Char)
+-- Bifix (Right 'a')
+instance Show2 f => Show1 (Bifix f) where
+  liftShowsPrec s sl = go where
+    goList = showListWith (go 0)
+    go d (Bifix x) = showParen (d > 10)
+      $ showString "Bifix "
+      . liftShowsPrec2 go goList s sl 11 x
+
+-- > read "Bifix (Right 'a')" :: Bifix Either Char
+-- Bifix (Right 'a')
+instance Read2 f => Read1 (Bifix f) where
+  liftReadsPrec r rl = go where
+    goList = _readListWith (go 0)
+    go d = readParen (d > 10) $ \s0 -> do
+      ("Bifix", s1) <-lex s0
+      (x,       s2) <- liftReadsPrec2 go goList r rl 11 s1
+      return (Bifix x, s2)
+
+-- Cannot write this instances, as transformes-0.4 doesn't have *2 classes.
+#endif
+
+type instance Base (Bifix f a) = Flip f a
+instance Bi.Bifunctor f => Recursive (Bifix f a) where
+  project = Flip . unbifix
+instance Bi.Bifunctor f => Corecursive (Bifix f a) where
+  embed = Bifix . runFlip
+
+#if __GLASGOW_HASKELL__
+#if HAS_POLY_TYPEABLE
+deriving instance Typeable Bifix
+deriving instance
+  ( Typeable (f :: * -> k -> *)
+  , Typeable a
+  , Typeable (Bifix :: (* -> k -> *) -> k -> *)
+  , Data (f (Bifix f a) a))
+  => Data (Bifix f a)
+#else
+-- TODO: Implement later
+#endif
+#endif
+
+-- |
+--
+-- > refixWith (Flip . Flip) "foo" :: Bifix (Flip ListF) Char
+-- No instance for (Show2 (Flip ListF))
+refixWith :: (Recursive s, Corecursive t) => (Base s t -> Base t t) -> s -> t
+refixWith f = cata (embed . f)
+
+toBifix :: (Recursive s, Base s ~ f a, Bi.Bifunctor f) => s -> Bifix (Flip f) a
+toBifix = refixWith (Flip . Flip)
+
+fromBifix :: (Corecursive t, Base t ~ f a, Bi.Bifunctor f) => Bifix (Flip f) a -> t
+fromBifix = refixWith (runFlip . runFlip)
 
 -------------------------------------------------------------------------------
 -- Lambek
