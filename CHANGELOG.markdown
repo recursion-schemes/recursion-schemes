@@ -5,6 +5,7 @@
 * Remove `Prim` data family. `ListF` as a new name for `Prim [a]`, with plenty of instances, e.g. `Traversable`.
 * Export `unfix`
 * Add chronomorphisms: `chrono` and `gchrono`.
+* Add `distGApoT`
 
 ## 4.1.2
 * Support for `free` 4.12.1
