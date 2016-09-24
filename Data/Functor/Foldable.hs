@@ -99,6 +99,8 @@ import Control.Comonad.Trans.Class
 import Control.Comonad.Trans.Env
 import qualified Control.Comonad.Cofree as Cofree
 import Control.Comonad.Cofree (Cofree(..))
+import           Control.Comonad.Trans.Cofree (CofreeF)
+import qualified Control.Comonad.Trans.Cofree as CCTC
 import Control.Monad (liftM, join)
 import Control.Monad.Free (Free(..))
 import Control.Monad.Trans.Except (ExceptT(..), runExceptT)
@@ -328,6 +330,15 @@ instance Recursive (NonEmpty a) where
   project (x:|xs) = NonEmptyF x $ nonEmpty xs
 instance Corecursive (NonEmpty a) where
   embed = (:|) <$> NEF.head <*> (maybe [] toList <$> NEF.tail)
+
+-- | Cofree comonads are Recursive/Corecursive
+type instance Base (Cofree f a) = CofreeF f a
+
+instance Functor f => Recursive (Cofree f a) where
+  project (x :< xs) = x CCTC.:< xs
+
+instance Functor f => Corecursive (Cofree f a) where
+  embed (x CCTC.:< xs) = x :< xs
 
 -- | Example boring stub for non-recursive data types
 type instance Base (Maybe a) = Const (Maybe a)
