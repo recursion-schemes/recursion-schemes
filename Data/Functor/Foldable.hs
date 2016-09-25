@@ -103,6 +103,7 @@ import           Control.Comonad.Trans.Cofree (CofreeF, CofreeT(..))
 import qualified Control.Comonad.Trans.Cofree as CCTC
 import Control.Monad (liftM, join)
 import Control.Monad.Free (Free(..))
+import qualified Control.Monad.Free.Church as CMFC
 import Control.Monad.Trans.Except (ExceptT(..), runExceptT)
 import           Control.Monad.Trans.Free (FreeF, FreeT(..))
 import qualified Control.Monad.Trans.Free as CMTF
@@ -358,7 +359,7 @@ type instance Base (Free f a) = FreeF f a
 instance Functor f => Recursive (Free f a) where
   project (Pure a) = CMTF.Pure a
   project (Free f) = CMTF.Free f
-
+-- | See note on the instance for 'CMTC.F'.
 instance Functor f => Corecursive (Free f a) where
   embed (CMTF.Pure a) = Pure a
   embed (CMTF.Free f) = Free f
@@ -544,6 +545,21 @@ instance (Functor f, Read1 f) => Read (Mu f) where
     Ident "fromFix" <- lexP
     fromFix <$> step readPrec
 #endif
+
+-- | Church encoded free monads are Recursive/Corecursive, in the same way that
+-- 'Mu' is.
+type instance Base (CMFC.F f a) = FreeF f a
+cmfcCata :: (a -> r) -> (f r -> r) -> CMFC.F f a -> r
+cmfcCata p f (CMFC.F run) = run p f
+instance Functor f => Recursive (CMFC.F f a) where
+  project = lambek
+  cata f = cmfcCata (f . CMTF.Pure) (f . CMTF.Free)
+-- | NB: Composing any typeclass method with 'CMTC.fromF' allows the result to
+-- be 'CMTC.improve'd, which should perform better than using the instance for
+-- 'Free' directly.
+instance Functor f => Corecursive (CMFC.F f a) where
+  embed (CMTF.Pure a)  = CMFC.F $ \p _ -> p a
+  embed (CMTF.Free fr) = CMFC.F $ \p f -> f $ fmap (cmfcCata p f) fr
 
 data Nu f where Nu :: (a -> f a) -> a -> Nu f
 type instance Base (Nu f) = f
