@@ -359,10 +359,16 @@ type instance Base (Free f a) = FreeF f a
 instance Functor f => Recursive (Free f a) where
   project (Pure a) = CMTF.Pure a
   project (Free f) = CMTF.Free f
--- | See note on the instance for 'CMTC.F'.
+
+improveF :: Functor f => CMFC.F f a -> Free f a
+improveF x = CMFC.improve (CMFC.fromF x)
+-- | It may be better to work with the instance for `CMFC.F` directly.
 instance Functor f => Corecursive (Free f a) where
   embed (CMTF.Pure a) = Pure a
   embed (CMTF.Free f) = Free f
+  ana               coalg = improveF . ana               coalg
+  postpro       nat coalg = improveF . postpro       nat coalg
+  gpostpro dist nat coalg = improveF . gpostpro dist nat coalg
 
 -- | Free transformations of monads are Recursive/Corecursive
 type instance Base (FreeT f m a) = Compose m (FreeF f a)
@@ -554,9 +560,6 @@ cmfcCata p f (CMFC.F run) = run p f
 instance Functor f => Recursive (CMFC.F f a) where
   project = lambek
   cata f = cmfcCata (f . CMTF.Pure) (f . CMTF.Free)
--- | NB: Composing any typeclass method with 'CMTC.fromF' allows the result to
--- be 'CMTC.improve'd, which should perform better than using the instance for
--- 'Free' directly.
 instance Functor f => Corecursive (CMFC.F f a) where
   embed (CMTF.Pure a)  = CMFC.F $ \p _ -> p a
   embed (CMTF.Free fr) = CMFC.F $ \p f -> f $ fmap (cmfcCata p f) fr
