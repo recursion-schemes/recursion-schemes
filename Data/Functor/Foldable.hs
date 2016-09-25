@@ -373,6 +373,14 @@ instance (Functor m, Functor f) => Recursive (FreeT f m a) where
 instance (Functor m, Functor f) => Corecursive (FreeT f m a) where
   embed = FreeT . getCompose
 
+-- If you are looking for instances for the free MonadPlus, please use the
+-- instance for FreeT f [].
+
+-- If you are looking for instances for the free alternative and free
+-- applicative, I'm sorry to disapoint you but you won't find them in this
+-- package.  They can be considered recurive, but using non-uniform recursion;
+-- this package only implements uniformly recursive folds / unfolds.
+
 -- | Example boring stub for non-recursive data types
 type instance Base (Maybe a) = Const (Maybe a)
 instance Recursive (Maybe a) where project = Const
