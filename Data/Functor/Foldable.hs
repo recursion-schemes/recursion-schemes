@@ -104,7 +104,7 @@ import qualified Control.Comonad.Trans.Cofree as CCTC
 import Control.Monad (liftM, join)
 import Control.Monad.Free (Free(..))
 import Control.Monad.Trans.Except (ExceptT(..), runExceptT)
-import           Control.Monad.Trans.Free (FreeF)
+import           Control.Monad.Trans.Free (FreeF, FreeT(..))
 import qualified Control.Monad.Trans.Free as CMTF
 import Data.Functor.Identity
 import Control.Arrow
@@ -362,6 +362,15 @@ instance Functor f => Recursive (Free f a) where
 instance Functor f => Corecursive (Free f a) where
   embed (CMTF.Pure a) = Pure a
   embed (CMTF.Free f) = Free f
+
+-- | Free transformations of monads are Recursive/Corecursive
+type instance Base (FreeT f m a) = Compose m (FreeF f a)
+
+instance (Functor m, Functor f) => Recursive (FreeT f m a) where
+  project = Compose . runFreeT
+
+instance (Functor m, Functor f) => Corecursive (FreeT f m a) where
+  embed = FreeT . getCompose
 
 -- | Example boring stub for non-recursive data types
 type instance Base (Maybe a) = Const (Maybe a)
