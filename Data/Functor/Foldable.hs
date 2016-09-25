@@ -99,7 +99,7 @@ import Control.Comonad.Trans.Class
 import Control.Comonad.Trans.Env
 import qualified Control.Comonad.Cofree as Cofree
 import Control.Comonad.Cofree (Cofree(..))
-import           Control.Comonad.Trans.Cofree (CofreeF)
+import           Control.Comonad.Trans.Cofree (CofreeF, CofreeT(..))
 import qualified Control.Comonad.Trans.Cofree as CCTC
 import Control.Monad (liftM, join)
 import Control.Monad.Free (Free(..))
@@ -108,6 +108,7 @@ import Data.Functor.Identity
 import Control.Arrow
 import Data.Function (on)
 import Data.Functor.Classes
+import Data.Functor.Compose (Compose(..))
 import Data.List.NonEmpty(NonEmpty((:|)), nonEmpty, toList)
 import Text.Read
 import Text.Show
@@ -339,6 +340,15 @@ instance Functor f => Recursive (Cofree f a) where
 
 instance Functor f => Corecursive (Cofree f a) where
   embed (x CCTC.:< xs) = x :< xs
+
+-- | Cofree tranformations of comonads are Recursive/Corecusive
+type instance Base (CofreeT f w a) = Compose w (CofreeF f a)
+
+instance (Functor w, Functor f) => Recursive (CofreeT f w a) where
+  project = Compose . runCofreeT
+
+instance (Functor w, Functor f) => Corecursive (CofreeT f w a) where
+  embed = CofreeT . getCompose
 
 -- | Example boring stub for non-recursive data types
 type instance Base (Maybe a) = Const (Maybe a)
