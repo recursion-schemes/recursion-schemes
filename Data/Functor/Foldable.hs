@@ -337,19 +337,15 @@ instance Corecursive (NonEmpty a) where
 
 -- | Cofree comonads are Recursive/Corecursive
 type instance Base (Cofree f a) = CofreeF f a
-
 instance Functor f => Recursive (Cofree f a) where
   project (x :< xs) = x CCTC.:< xs
-
 instance Functor f => Corecursive (Cofree f a) where
   embed (x CCTC.:< xs) = x :< xs
 
 -- | Cofree tranformations of comonads are Recursive/Corecusive
 type instance Base (CofreeT f w a) = Compose w (CofreeF f a)
-
 instance (Functor w, Functor f) => Recursive (CofreeT f w a) where
   project = Compose . runCofreeT
-
 instance (Functor w, Functor f) => Corecursive (CofreeT f w a) where
   embed = CofreeT . getCompose
 
@@ -372,10 +368,8 @@ instance Functor f => Corecursive (Free f a) where
 
 -- | Free transformations of monads are Recursive/Corecursive
 type instance Base (FreeT f m a) = Compose m (FreeF f a)
-
 instance (Functor m, Functor f) => Recursive (FreeT f m a) where
   project = Compose . runFreeT
-
 instance (Functor m, Functor f) => Corecursive (FreeT f m a) where
   embed = FreeT . getCompose
 
