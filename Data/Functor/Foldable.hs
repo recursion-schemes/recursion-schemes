@@ -106,6 +106,7 @@ import Data.Functor.Identity
 import Control.Arrow
 import Data.Function (on)
 import Data.Functor.Classes
+import Data.List.NonEmpty(NonEmpty((:|)), nonEmpty, toList)
 import Text.Read
 import Text.Show
 #ifdef __GLASGOW_HASKELL__
@@ -131,6 +132,9 @@ import qualified Data.Traversable as T
 import qualified Data.Bifunctor as Bi
 import qualified Data.Bifoldable as Bi
 import qualified Data.Bitraversable as Bi
+
+import           Data.Functor.Base hiding (head, tail)
+import qualified Data.Functor.Base as NEF (NonEmptyF(..))
 
 type family Base t :: * -> *
 
@@ -318,6 +322,12 @@ instance Corecursive [a] where
     Cons x (Left xs) -> x : xs
     Cons x (Right b) -> x : apo f b
     Nil -> []
+
+type instance Base (NonEmpty a) = NonEmptyF a
+instance Recursive (NonEmpty a) where
+  project (x:|xs) = NonEmptyF x $ nonEmpty xs
+instance Corecursive (NonEmpty a) where
+  embed = (:|) <$> NEF.head <*> (maybe [] toList <$> NEF.tail)
 
 -- | Example boring stub for non-recursive data types
 type instance Base (Maybe a) = Const (Maybe a)
