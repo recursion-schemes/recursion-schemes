@@ -99,13 +99,19 @@ import Control.Comonad.Trans.Class
 import Control.Comonad.Trans.Env
 import qualified Control.Comonad.Cofree as Cofree
 import Control.Comonad.Cofree (Cofree(..))
+import           Control.Comonad.Trans.Cofree (CofreeF, CofreeT(..))
+import qualified Control.Comonad.Trans.Cofree as CCTC
 import Control.Monad (liftM, join)
 import Control.Monad.Free (Free(..))
+import qualified Control.Monad.Free.Church as CMFC
 import Control.Monad.Trans.Except (ExceptT(..), runExceptT)
+import           Control.Monad.Trans.Free (FreeF, FreeT(..))
+import qualified Control.Monad.Trans.Free as CMTF
 import Data.Functor.Identity
 import Control.Arrow
 import Data.Function (on)
 import Data.Functor.Classes
+import Data.Functor.Compose (Compose(..))
 import Data.List.NonEmpty(NonEmpty((:|)), nonEmpty, toList)
 import Text.Read
 import Text.Show
@@ -329,6 +335,52 @@ instance Recursive (NonEmpty a) where
 instance Corecursive (NonEmpty a) where
   embed = (:|) <$> NEF.head <*> (maybe [] toList <$> NEF.tail)
 
+-- | Cofree comonads are Recursive/Corecursive
+type instance Base (Cofree f a) = CofreeF f a
+instance Functor f => Recursive (Cofree f a) where
+  project (x :< xs) = x CCTC.:< xs
+instance Functor f => Corecursive (Cofree f a) where
+  embed (x CCTC.:< xs) = x :< xs
+
+-- | Cofree tranformations of comonads are Recursive/Corecusive
+type instance Base (CofreeT f w a) = Compose w (CofreeF f a)
+instance (Functor w, Functor f) => Recursive (CofreeT f w a) where
+  project = Compose . runCofreeT
+instance (Functor w, Functor f) => Corecursive (CofreeT f w a) where
+  embed = CofreeT . getCompose
+
+-- | Free monads are Recursive/Corecursive
+type instance Base (Free f a) = FreeF f a
+
+instance Functor f => Recursive (Free f a) where
+  project (Pure a) = CMTF.Pure a
+  project (Free f) = CMTF.Free f
+
+improveF :: Functor f => CMFC.F f a -> Free f a
+improveF x = CMFC.improve (CMFC.fromF x)
+-- | It may be better to work with the instance for `CMFC.F` directly.
+instance Functor f => Corecursive (Free f a) where
+  embed (CMTF.Pure a) = Pure a
+  embed (CMTF.Free f) = Free f
+  ana               coalg = improveF . ana               coalg
+  postpro       nat coalg = improveF . postpro       nat coalg
+  gpostpro dist nat coalg = improveF . gpostpro dist nat coalg
+
+-- | Free transformations of monads are Recursive/Corecursive
+type instance Base (FreeT f m a) = Compose m (FreeF f a)
+instance (Functor m, Functor f) => Recursive (FreeT f m a) where
+  project = Compose . runFreeT
+instance (Functor m, Functor f) => Corecursive (FreeT f m a) where
+  embed = FreeT . getCompose
+
+-- If you are looking for instances for the free MonadPlus, please use the
+-- instance for FreeT f [].
+
+-- If you are looking for instances for the free alternative and free
+-- applicative, I'm sorry to disapoint you but you won't find them in this
+-- package.  They can be considered recurive, but using non-uniform recursion;
+-- this package only implements uniformly recursive folds / unfolds.
+
 -- | Example boring stub for non-recursive data types
 type instance Base (Maybe a) = Const (Maybe a)
 instance Recursive (Maybe a) where project = Const
@@ -501,6 +553,18 @@ instance (Functor f, Read1 f) => Read (Mu f) where
     Ident "fromFix" <- lexP
     fromFix <$> step readPrec
 #endif
+
+-- | Church encoded free monads are Recursive/Corecursive, in the same way that
+-- 'Mu' is.
+type instance Base (CMFC.F f a) = FreeF f a
+cmfcCata :: (a -> r) -> (f r -> r) -> CMFC.F f a -> r
+cmfcCata p f (CMFC.F run) = run p f
+instance Functor f => Recursive (CMFC.F f a) where
+  project = lambek
+  cata f = cmfcCata (f . CMTF.Pure) (f . CMTF.Free)
+instance Functor f => Corecursive (CMFC.F f a) where
+  embed (CMTF.Pure a)  = CMFC.F $ \p _ -> p a
+  embed (CMTF.Free fr) = CMFC.F $ \p f -> f $ fmap (cmfcCata p f) fr
 
 data Nu f where Nu :: (a -> f a) -> a -> Nu f
 type instance Base (Nu f) = f
