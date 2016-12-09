@@ -1,17 +1,82 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Data.Functor.Foldable.TH
   ( makeBaseFunctor
+  , makeBaseFunctorWith
+  , BaseRules (..)
+  , baseRules
   ) where
 
 import Data.Bifunctor (first)
 import Data.Functor.Foldable
 import Language.Haskell.TH
 
+-- | Build base functor with a sensible default configuration.
+--
+-- /e.g./
+--
+-- @
+-- data Expr a
+--     = Lit a
+--     | Add (Expr a) (Expr a)
+--     | Mul (Expr a) (Expr a)
+--   deriving (Show)
+-- @
+--
+-- will create
+--
+-- @
+-- data ExprF a x
+--     = LitF a
+--     | Add x x
+--     | Mul x x
+--   deriving ('Functor')
+--
+-- type instance 'Base' (Expr a) = ExprF a
+--
+-- instance 'Recursive' (Expr a) where
+--     'project' (Lit x)   = LitF x
+--     'project' (Add x y) = AddF x y
+--     'project' (Mul x y) = MulF x y
+--
+-- instance 'Corecursive' (Expr a) where
+--     'embed' (LitF x)   = Lit x
+--     'embed' (AddF x y) = Add x y
+--     'embed' (MulF x y) = Mul x y
+-- @
+--
+-- @
+-- 'makeBaseFunctor' = 'makeBaseFunctorWith' 'baseRules'
+-- @
+--
+-- /Notes:/
+--
+-- 'makeBaseFunctor' works only with ADTs. Existentials and GADTs aren't supported.
 makeBaseFunctor :: Name -> DecsQ
-makeBaseFunctor name = reify name >>= f
+makeBaseFunctor = makeBaseFunctorWith baseRules
+
+-- | Build base functor with a custom configuration.
+makeBaseFunctorWith :: BaseRules -> Name -> DecsQ
+makeBaseFunctorWith _ name = reify name >>= f
   where
     f (TyConI dec) = makePrimForDec dec
     f _            = fail "makeBaseFunctor: Expected type constructor name"
+
+-- | /TODO/: Add functions to rename
+--
+-- * type: @(++ \"F\")@
+--
+-- * type constructors: @(++ \"F\")@
+--
+-- * infix type constructors: ?
+--
+-- * fields: @(++ \"F\")@
+--
+-- * infix fields: ?
+--
+data BaseRules = BaseRules
+
+baseRules :: BaseRules
+baseRules = BaseRules
 
 toFName :: Name -> Name
 toFName name = mkName $ nameBase name ++ "F"
