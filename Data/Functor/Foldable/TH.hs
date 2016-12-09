@@ -29,7 +29,7 @@ import Language.Haskell.TH
 --     = LitF a
 --     | Add x x
 --     | Mul x x
---   deriving ('Functor')
+--   deriving ('Functor', 'Foldable', 'Traversable')
 --
 -- type instance 'Base' (Expr a) = ExprF a
 --
@@ -117,7 +117,7 @@ makePrimForDec' tyName vars cons = do
     let consF = map makeCon fieldConsF
 
     -- Data definition
-    let dataDec = DataD [] tyNameF varsF Nothing consF [ConT ''Functor]
+    let dataDec = DataD [] tyNameF varsF Nothing consF [ConT ''Functor, ConT ''Foldable, ConT ''Traversable]
 
     -- type instance Base
     let baseDec = TySynInstD ''Base (TySynEqn [s] $ conAppsT tyNameF vars')
