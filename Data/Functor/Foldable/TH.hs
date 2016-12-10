@@ -1,4 +1,3 @@
-{-# LANGUAGE TemplateHaskell #-}
 module Data.Functor.Foldable.TH
   ( makeBaseFunctor
   , makeBaseFunctorWith
@@ -7,8 +6,8 @@ module Data.Functor.Foldable.TH
   ) where
 
 import Data.Bifunctor (first)
-import Data.Functor.Foldable
 import Language.Haskell.TH
+import Language.Haskell.TH.Syntax (mkNameG_tc, mkNameG_v)
 
 -- | Build base functor with a sensible default configuration.
 --
@@ -125,20 +124,20 @@ makePrimForDec' rules tyName vars cons = do
     let consF = map makeCon fieldConsF
 
     -- Data definition
-    let dataDec = DataD [] tyNameF varsF Nothing consF [ConT ''Functor, ConT ''Foldable, ConT ''Traversable]
+    let dataDec = DataD [] tyNameF varsF Nothing consF [ConT functorTypeName, ConT foldableTypeName, ConT traversableTypeName]
 
     -- type instance Base
-    let baseDec = TySynInstD ''Base (TySynEqn [s] $ conAppsT tyNameF vars')
+    let baseDec = TySynInstD baseTypeName (TySynEqn [s] $ conAppsT tyNameF vars')
 
     -- instance Recursive
     args <- (traverse . traverse . traverse) (\_ -> newName "x") fieldCons
 
-    let projDec = FunD 'project (mkMorphism id toFName args)
-    let recursiveDec = InstanceD Nothing [] (ConT ''Recursive `AppT` s) [projDec]
+    let projDec = FunD projectValName (mkMorphism id toFName args)
+    let recursiveDec = InstanceD Nothing [] (ConT recursiveTypeName `AppT` s) [projDec]
 
     -- instance Corecurive
-    let embedDec = FunD 'embed (mkMorphism toFName id args)
-    let corecursiveDec = InstanceD Nothing [] (ConT ''Corecursive `AppT` s) [embedDec]
+    let embedDec = FunD embedValName (mkMorphism toFName id args)
+    let corecursiveDec = InstanceD Nothing [] (ConT corecursiveTypeName `AppT` s) [embedDec]
 
     -- Combine
     pure [dataDec, baseDec, recursiveDec, corecursiveDec]
@@ -212,3 +211,47 @@ substType a b = go
 #endif
     -- TODO:
     go x = x
+
+-------------------------------------------------------------------------------
+-- Manually quoted names
+-------------------------------------------------------------------------------
+-- By manually generating these names we avoid needing to use the
+-- TemplateHaskell language extension when compiling this library.
+-- This allows the library to be used in stage1 cross-compilers.
+
+rsPackageKey :: String
+#ifdef CURRENT_PACKAGE_KEY
+rsPackageKey = CURRENT_PACKAGE_KEY
+#else
+rsPackageKey = "recursion-schemes-" ++ showVersion version
+#endif
+
+mkRsName_tc :: String -> String -> Name
+mkRsName_tc = mkNameG_tc rsPackageKey
+
+mkRsName_v :: String -> String -> Name
+mkRsName_v = mkNameG_v rsPackageKey
+
+baseTypeName :: Name
+baseTypeName = mkRsName_tc "Data.Functor.Foldable" "Base"
+
+recursiveTypeName :: Name
+recursiveTypeName = mkRsName_tc "Data.Functor.Foldable" "Recursive"
+
+corecursiveTypeName :: Name
+corecursiveTypeName = mkRsName_tc "Data.Functor.Foldable" "Corecursive"
+
+projectValName :: Name
+projectValName = mkRsName_v "Data.Functor.Foldable" "project"
+
+embedValName :: Name
+embedValName = mkRsName_v "Data.Functor.Foldable" "embed"
+
+functorTypeName :: Name
+functorTypeName = mkNameG_tc "base" "GHC.Base" "Functor"
+
+foldableTypeName :: Name
+foldableTypeName = mkNameG_tc "base" "Data.Foldable" "Foldable"
+
+traversableTypeName :: Name
+traversableTypeName = mkNameG_tc "base" "Data.Traversable" "Traversable"
