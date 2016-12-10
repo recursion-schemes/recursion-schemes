@@ -56,9 +56,9 @@ makeBaseFunctor = makeBaseFunctorWith baseRules
 
 -- | Build base functor with a custom configuration.
 makeBaseFunctorWith :: BaseRules -> Name -> DecsQ
-makeBaseFunctorWith _ name = reify name >>= f
+makeBaseFunctorWith rules name = reify name >>= f
   where
-    f (TyConI dec) = makePrimForDec dec
+    f (TyConI dec) = makePrimForDec rules dec
     f _            = fail "makeBaseFunctor: Expected type constructor name"
 
 -- | /TODO/: Add functions to rename
@@ -74,9 +74,17 @@ makeBaseFunctorWith _ name = reify name >>= f
 -- * infix fields: ?
 --
 data BaseRules = BaseRules
+    { _baseRulesType  :: Name -> Name
+    , _baseRulesCon   :: Name -> Name
+    , _baseRulesField :: Name -> Name
+    }
 
 baseRules :: BaseRules
 baseRules = BaseRules
+    { _baseRulesType  = toFName
+    , _baseRulesCon   = toFName
+    , _baseRulesField = toFName
+    }
 
 toFName :: Name -> Name
 toFName name = mkName $ nameBase name ++ "F"
@@ -85,23 +93,23 @@ varBindName :: TyVarBndr -> Name
 varBindName (PlainTV n)    = n
 varBindName (KindedTV n _) = n
 
-makePrimForDec :: Dec -> DecsQ
-makePrimForDec dec = case dec of
+makePrimForDec :: BaseRules -> Dec -> DecsQ
+makePrimForDec rules dec = case dec of
 #if MIN_VERSION_template_haskell(2,11,0)
   DataD    _ tyName vars _ cons _ -> do
-    makePrimForDec' tyName vars cons
+    makePrimForDec' rules tyName vars cons
 #else
   DataD    _ tyName vars cons _ ->
-    makePrimForDec' tyName vars cons
+    makePrimForDec' rules tyName vars cons
 #endif
   _ -> fail "makeFieldOptics: Expected data type-constructor"
 
-makePrimForDec' :: Name -> [TyVarBndr] -> [Con] -> DecsQ
-makePrimForDec' tyName vars cons = do
+makePrimForDec' :: BaseRules -> Name -> [TyVarBndr] -> [Con] -> DecsQ
+makePrimForDec' rules tyName vars cons = do
     -- variable parameters
     let vars' = map VarT (typeVars vars)
     -- Name of base functor
-    let tyNameF = toFName tyName
+    let tyNameF = _baseRulesType rules tyName
     -- Recursive type
     let s = conAppsT tyName vars'
     -- Additional argument
@@ -135,8 +143,8 @@ makePrimForDec' tyName vars cons = do
     -- Combine
     pure [dataDec, baseDec, recursiveDec, corecursiveDec]
   where
-    toF s r (n, fs) = (toFName n, map (toF' s r) fs)
-    toF' s r (n, t) = (fmap toFName n, substType s r t)
+    toF s r (n, fs) = (_baseRulesCon rules n, map (toF' s r) fs)
+    toF' s r (n, t) = (fmap (_baseRulesField rules) n, substType s r t)
 
     makeCon (name, fs) = NormalC name (map (f . snd) fs)
       where
