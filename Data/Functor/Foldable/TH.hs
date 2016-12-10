@@ -10,6 +10,7 @@ import Data.Bifunctor (first)
 import Data.Functor.Identity
 import Language.Haskell.TH
 import Language.Haskell.TH.Syntax (mkNameG_tc, mkNameG_v)
+import Text.Read.Lex (isSymbolChar)
 
 -- | Build base functor with a sensible default configuration.
 --
@@ -19,7 +20,7 @@ import Language.Haskell.TH.Syntax (mkNameG_tc, mkNameG_v)
 -- data Expr a
 --     = Lit a
 --     | Add (Expr a) (Expr a)
---     | Mul (Expr a) (Expr a)
+--     | Expr a :* [Expr a]
 --   deriving (Show)
 -- @
 --
@@ -28,8 +29,8 @@ import Language.Haskell.TH.Syntax (mkNameG_tc, mkNameG_v)
 -- @
 -- data ExprF a x
 --     = LitF a
---     | Add x x
---     | Mul x x
+--     | AddF x x
+--     | x :*$ [x]
 --   deriving ('Functor', 'Foldable', 'Traversable')
 --
 -- type instance 'Base' (Expr a) = ExprF a
@@ -37,12 +38,12 @@ import Language.Haskell.TH.Syntax (mkNameG_tc, mkNameG_v)
 -- instance 'Recursive' (Expr a) where
 --     'project' (Lit x)   = LitF x
 --     'project' (Add x y) = AddF x y
---     'project' (Mul x y) = MulF x y
+--     'project' (x :* y)  = x :*$ y
 --
 -- instance 'Corecursive' (Expr a) where
 --     'embed' (LitF x)   = Lit x
 --     'embed' (AddF x y) = Add x y
---     'embed' (MulF x y) = Mul x y
+--     'embed' (x :*$ y)  = x :*$ y
 -- @
 --
 -- @
@@ -67,18 +68,7 @@ makeBaseFunctorWith rules name = reify name >>= f
     f (TyConI dec) = makePrimForDec rules dec
     f _            = fail "makeBaseFunctor: Expected type constructor name"
 
--- | /TODO/: Add functions to rename
---
--- * type: @(++ \"F\")@
---
--- * type constructors: @(++ \"F\")@
---
--- * infix type constructors: ?
---
--- * fields: @(++ \"F\")@
---
--- * infix fields: ?
---
+-- | Rules of renaming data names
 data BaseRules = BaseRules
     { _baseRulesType  :: Name -> Name
     , _baseRulesCon   :: Name -> Name
@@ -93,7 +83,13 @@ baseRules = BaseRules
     }
 
 toFName :: Name -> Name
-toFName name = mkName $ nameBase name ++ "F"
+toFName = mkName . f . nameBase
+  where
+    f name | isInfixName name = name ++ "$"
+           | otherwise        = name ++ "F"
+
+    isInfixName :: String -> Bool
+    isInfixName = all isSymbolChar
 
 makePrimForDec :: BaseRules -> Dec -> DecsQ
 makePrimForDec rules dec = case dec of
