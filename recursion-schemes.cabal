@@ -68,4 +68,5 @@ test-suite Expr
   ghc-options: -Wall -threaded
   build-depends:
     base,
+    HUnit <1.6,
     recursion-schemes
