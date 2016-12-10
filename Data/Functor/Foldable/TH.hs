@@ -1,3 +1,4 @@
+{-# LANGUAGE Rank2Types #-}
 module Data.Functor.Foldable.TH
   ( makeBaseFunctor
   , makeBaseFunctorWith
@@ -6,6 +7,7 @@ module Data.Functor.Foldable.TH
   ) where
 
 import Data.Bifunctor (first)
+import Data.Functor.Identity
 import Language.Haskell.TH
 import Language.Haskell.TH.Syntax (mkNameG_tc, mkNameG_v)
 
@@ -49,7 +51,12 @@ import Language.Haskell.TH.Syntax (mkNameG_tc, mkNameG_v)
 --
 -- /Notes:/
 --
--- 'makeBaseFunctor' works only with ADTs. Existentials and GADTs aren't supported.
+-- 'makeBaseFunctor' works properly only with ADTs.
+-- Existentials and GADTs etc. may work, if the recursion is parametric.
+--
+-- /TODO:/
+--
+-- make GADTs work
 makeBaseFunctor :: Name -> DecsQ
 makeBaseFunctor = makeBaseFunctorWith baseRules
 
@@ -88,10 +95,6 @@ baseRules = BaseRules
 toFName :: Name -> Name
 toFName name = mkName $ nameBase name ++ "F"
 
-varBindName :: TyVarBndr -> Name
-varBindName (PlainTV n)    = n
-varBindName (KindedTV n _) = n
-
 makePrimForDec :: BaseRules -> Dec -> DecsQ
 makePrimForDec rules dec = case dec of
 #if MIN_VERSION_template_haskell(2,11,0)
@@ -116,12 +119,13 @@ makePrimForDec' rules tyName vars cons = do
     let r = VarT rName
     -- Vars
     let varsF = vars ++ [PlainTV rName]
-
     let fieldCons = map normalizeConstructor cons
-    let fieldConsF = map (toF s r) fieldCons
 
-    -- TODO: transform 'cons' directly
-    let consF = map makeCon fieldConsF
+    let consF
+          = conNameMap (_baseRulesCon rules)
+          . conFieldNameMap (_baseRulesField rules)
+          . conTypeMap (substType s r)
+          <$> cons
 
     -- Data definition
     let dataDec = DataD [] tyNameF varsF Nothing consF [ConT functorTypeName, ConT foldableTypeName, ConT traversableTypeName]
@@ -141,13 +145,6 @@ makePrimForDec' rules tyName vars cons = do
 
     -- Combine
     pure [dataDec, baseDec, recursiveDec, corecursiveDec]
-  where
-    toF s r (n, fs) = (_baseRulesCon rules n, map (toF' s r) fs)
-    toF' s r (n, t) = (fmap (_baseRulesField rules) n, substType s r t)
-
-    makeCon (name, fs) = NormalC name (map (f . snd) fs)
-      where
-        f t = (Bang NoSourceUnpackedness NoSourceStrictness, t)
 
 -- | makes clauses to rename constructors
 mkMorphism
@@ -187,9 +184,73 @@ normalizeConstructor (RecGadtC ns xs _) =
   (head ns, [ (Just fieldName, ty) | (fieldName,_,ty) <- xs])
 #endif
 
+-------------------------------------------------------------------------------
+-- Traversals
+-------------------------------------------------------------------------------
+
+conNameTraversal :: Applicative f => (Name -> f Name) -> Con -> f Con
+conNameTraversal f (NormalC n xs)       = NormalC <$> f n <*> pure xs
+conNameTraversal f (RecC n xs)          = RecC <$> f n <*> pure xs
+conNameTraversal f (InfixC l n r)       = InfixC l <$> f n <*> pure r
+conNameTraversal f (ForallC xs ctx con) = ForallC xs ctx <$> conNameTraversal f con
+#if MIN_VERSION_template_haskell(2,11,0)
+conNameTraversal f (GadtC ns xs t)      = GadtC <$> traverse f ns <*> pure xs <*> pure t
+conNameTraversal f (RecGadtC ns xs t)   = RecGadtC <$> traverse f ns <*> pure xs <*> pure t
+#endif
+
+conFieldNameTraversal :: Applicative f => (Name -> f Name) -> Con -> f Con
+conFieldNameTraversal f (RecC n xs)          = RecC n <$> (traverse . tripleFst) f xs
+conFieldNameTraversal f (ForallC xs ctx con) = ForallC xs ctx <$> conFieldNameTraversal f con
+#if MIN_VERSION_template_haskell(2,11,0)
+conFieldNameTraversal f (RecGadtC ns xs t)   = RecGadtC ns <$> (traverse . tripleFst) f xs <*> pure t
+#endif
+conFieldNameTraversal _ x = pure x
+
+conTypeTraversal :: Applicative f => (Type -> f Type) -> Con -> f Con
+conTypeTraversal f (NormalC n xs)       = NormalC n <$> (traverse . pairSnd) f xs
+conTypeTraversal f (RecC n xs)          = RecC n <$> (traverse . tripleTrd) f xs
+conTypeTraversal f (InfixC l n r)       = InfixC <$> pairSnd f l <*> pure n <*> pairSnd f r
+conTypeTraversal f (ForallC xs ctx con) = ForallC xs ctx <$> conTypeTraversal f con
+#if MIN_VERSION_template_haskell(2,11,0)
+conTypeTraversal f (GadtC ns xs t)      = GadtC ns <$> (traverse . pairSnd) f xs <*> pure t
+conTypeTraversal f (RecGadtC ns xs t)   = RecGadtC ns <$> (traverse . tripleTrd) f xs <*> pure t
+#endif
+
+conNameMap :: (Name -> Name) -> Con -> Con
+conNameMap f = runIdentity . conNameTraversal (Identity . f)
+
+conFieldNameMap :: (Name -> Name) -> Con -> Con
+conFieldNameMap f = runIdentity . conFieldNameTraversal (Identity . f)
+
+conTypeMap :: (Type -> Type) -> Con -> Con
+conTypeMap f = runIdentity . conTypeTraversal (Identity . f)
+
+-------------------------------------------------------------------------------
+-- Monomorphic tuple lenses
+-------------------------------------------------------------------------------
+
+type Lens' s a = forall f. Functor f => (a -> f a) -> s -> f s
+
+pairSnd :: Lens' (a, b) b
+pairSnd f (a, b) = (,) a <$> f b
+
+tripleTrd :: Lens' (a, b, c) c
+tripleTrd f (a,b,c) = (,,) a b <$> f c
+
+tripleFst :: Lens' (a, b, c) a
+tripleFst f (a,b,c) = (\a' -> (a', b, c)) <$> f a
+
+-------------------------------------------------------------------------------
+-- Type mangling
+-------------------------------------------------------------------------------
+
 -- | Extraty type variables
 typeVars :: [TyVarBndr] -> [Name]
 typeVars = map varBindName
+
+varBindName :: TyVarBndr -> Name
+varBindName (PlainTV n)    = n
+varBindName (KindedTV n _) = n
 
 -- | Apply arguments to a type constructor.
 conAppsT :: Name -> [Type] -> Type
