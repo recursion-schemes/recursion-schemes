@@ -1,4 +1,5 @@
-{-# LANGUAGE TemplateHaskell, KindSignatures, DeriveTraversable, TypeFamilies #-}
+{-# LANGUAGE TemplateHaskell, KindSignatures, TypeFamilies #-}
+{-# LANGUAGE DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
 module Main where
 
 import Data.Functor.Foldable

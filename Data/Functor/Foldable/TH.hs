@@ -6,11 +6,14 @@ module Data.Functor.Foldable.TH
   , baseRules
   ) where
 
+import Control.Applicative as A
+import Data.Traversable as T
 import Data.Bifunctor (first)
 import Data.Functor.Identity
 import Language.Haskell.TH
 import Language.Haskell.TH.Syntax (mkNameG_tc, mkNameG_v)
-import Text.Read.Lex (isSymbolChar)
+import Data.Char (GeneralCategory (..), generalCategory)
+import Data.Orphans ()
 
 -- | Build base functor with a sensible default configuration.
 --
@@ -124,20 +127,36 @@ makePrimForDec' rules tyName vars cons = do
           <$> cons
 
     -- Data definition
+#if MIN_VERSION_template_haskell(2,11,0)
     let dataDec = DataD [] tyNameF varsF Nothing consF [ConT functorTypeName, ConT foldableTypeName, ConT traversableTypeName]
+#else
+    let dataDec = DataD [] tyNameF varsF consF [functorTypeName, foldableTypeName, traversableTypeName]
+#endif
 
     -- type instance Base
+#if MIN_VERSION_template_haskell(2,9,0)
     let baseDec = TySynInstD baseTypeName (TySynEqn [s] $ conAppsT tyNameF vars')
+#else
+    let baseDec = TySynInstD baseTypeName [s] $ conAppsT tyNameF vars'
+#endif
 
     -- instance Recursive
     args <- (traverse . traverse . traverse) (\_ -> newName "x") fieldCons
 
     let projDec = FunD projectValName (mkMorphism id toFName args)
+#if MIN_VERSION_template_haskell(2,11,0)
     let recursiveDec = InstanceD Nothing [] (ConT recursiveTypeName `AppT` s) [projDec]
+#else
+    let recursiveDec = InstanceD [] (ConT recursiveTypeName `AppT` s) [projDec]
+#endif
 
     -- instance Corecursive
     let embedDec = FunD embedValName (mkMorphism toFName id args)
+#if MIN_VERSION_template_haskell(2,11,0)
     let corecursiveDec = InstanceD Nothing [] (ConT corecursiveTypeName `AppT` s) [embedDec]
+#else
+    let corecursiveDec = InstanceD [] (ConT corecursiveTypeName `AppT` s) [embedDec]
+#endif
 
     -- Combine
     pure [dataDec, baseDec, recursiveDec, corecursiveDec]
@@ -185,12 +204,12 @@ normalizeConstructor (RecGadtC ns xs _) =
 -------------------------------------------------------------------------------
 
 conNameTraversal :: Applicative f => (Name -> f Name) -> Con -> f Con
-conNameTraversal f (NormalC n xs)       = NormalC <$> f n <*> pure xs
+conNameTraversal f (NormalC n xs)       = NormalC <$> f n <*> A.pure xs
 conNameTraversal f (RecC n xs)          = RecC <$> f n <*> pure xs
 conNameTraversal f (InfixC l n r)       = InfixC l <$> f n <*> pure r
 conNameTraversal f (ForallC xs ctx con) = ForallC xs ctx <$> conNameTraversal f con
 #if MIN_VERSION_template_haskell(2,11,0)
-conNameTraversal f (GadtC ns xs t)      = GadtC <$> traverse f ns <*> pure xs <*> pure t
+conNameTraversal f (GadtC ns xs t)      = GadtC <$> T.traverse f ns <*> pure xs <*> pure t
 conNameTraversal f (RecGadtC ns xs t)   = RecGadtC <$> traverse f ns <*> pure xs <*> pure t
 #endif
 
@@ -263,16 +282,34 @@ substType a b = go
     go x | x == a         = b
     go (VarT n)           = VarT n
     go (AppT l r)         = AppT (go l) (go r)
-    go (InfixT l n r)     = InfixT (go l) n (go r)
-    go (UInfixT l n r)    = UInfixT (go l) n (go r)
     go (ForallT xs ctx t) = ForallT xs ctx (go t)
     -- This may fail with kind error
     go (SigT t k)         = SigT (go t) k
 #if MIN_VERSION_template_haskell(2,11,0)
+    go (InfixT l n r)     = InfixT (go l) n (go r)
+    go (UInfixT l n r)    = UInfixT (go l) n (go r)
     go (ParensT t)        = ParensT (go t)
 #endif
     -- Rest are unchanged
     go x = x
+
+-------------------------------------------------------------------------------
+-- Compat from base-4.9
+-------------------------------------------------------------------------------
+
+isSymbolChar :: Char -> Bool
+isSymbolChar c = not (isPuncChar c) && case generalCategory c of
+    MathSymbol              -> True
+    CurrencySymbol          -> True
+    ModifierSymbol          -> True
+    OtherSymbol             -> True
+    DashPunctuation         -> True
+    OtherPunctuation        -> not (c `elem` "'\"")
+    ConnectorPunctuation    -> c /= '_'
+    _                       -> False
+
+isPuncChar :: Char -> Bool
+isPuncChar c = c `elem` ",;()[]{}`"
 
 -------------------------------------------------------------------------------
 -- Manually quoted names
