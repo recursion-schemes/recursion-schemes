@@ -264,13 +264,18 @@ substType
     -> Type
 substType a b = go
   where
-    go x | x == a = b
-    go (VarT n) = VarT n
-    go (AppT l r) = AppT (go l) (go r)
+    go x | x == a         = b
+    go (VarT n)           = VarT n
+    go (AppT l r)         = AppT (go l) (go r)
+    go (InfixT l n r)     = InfixT (go l) n (go r)
+    go (UInfixT l n r)    = UInfixT (go l) n (go r)
+    go (ForallT xs ctx t) = ForallT xs ctx (go t)
+    -- This may fail with kind error
+    go (SigT t k)         = SigT (go t) k
 #if MIN_VERSION_template_haskell(2,11,0)
-    go (ParensT t) = ParensT (go t)
+    go (ParensT t)        = ParensT (go t)
 #endif
-    -- TODO:
+    -- Rest are unchanged
     go x = x
 
 -------------------------------------------------------------------------------
