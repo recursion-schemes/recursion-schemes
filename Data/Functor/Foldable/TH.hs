@@ -139,7 +139,7 @@ makePrimForDec' rules tyName vars cons = do
     let projDec = FunD projectValName (mkMorphism id toFName args)
     let recursiveDec = InstanceD Nothing [] (ConT recursiveTypeName `AppT` s) [projDec]
 
-    -- instance Corecurive
+    -- instance Corecursive
     let embedDec = FunD embedValName (mkMorphism toFName id args)
     let corecursiveDec = InstanceD Nothing [] (ConT corecursiveTypeName `AppT` s) [embedDec]
 
@@ -153,7 +153,7 @@ mkMorphism
     -> [(Name, [Name])]
     -> [Clause]
 mkMorphism nFrom nTo args = flip map args $ \(n, fs) -> Clause
-    [ConP (nFrom n) (map VarP fs)]     -- patterns
+    [ConP (nFrom n) (map VarP fs)]                      -- patterns
     (NormalB $ foldl AppE (ConE $ nTo n) (map VarE fs)) -- body
     [] -- where dec
 
