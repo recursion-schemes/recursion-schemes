@@ -125,15 +125,19 @@ makePrimForDec :: BaseRules -> Dec -> DecsQ
 makePrimForDec rules dec = case dec of
 #if MIN_VERSION_template_haskell(2,11,0)
   DataD    _ tyName vars _ cons _ -> do
-    makePrimForDec' rules tyName vars cons
+    makePrimForDec' rules False tyName vars cons
+  NewtypeD _ tyName vars _ con _ -> do
+    makePrimForDec' rules True tyName vars [con]
 #else
   DataD    _ tyName vars cons _ ->
-    makePrimForDec' rules tyName vars cons
+    makePrimForDec' rules False tyName vars cons
+  NewtypeD _ tyName vars con _ -> do
+    makePrimForDec' rules True tyName vars [con]
 #endif
   _ -> fail "makeFieldOptics: Expected data type-constructor"
 
-makePrimForDec' :: BaseRules -> Name -> [TyVarBndr] -> [Con] -> DecsQ
-makePrimForDec' rules tyName vars cons = do
+makePrimForDec' :: BaseRules -> Bool -> Name -> [TyVarBndr] -> [Con] -> DecsQ
+makePrimForDec' rules isNewtype tyName vars cons = do
     -- variable parameters
     let vars' = map VarT (typeVars vars)
     -- Name of base functor
@@ -154,10 +158,16 @@ makePrimForDec' rules tyName vars cons = do
           <$> cons
 
     -- Data definition
+    let dataDec = case consF of
+          [conF] | isNewtype ->
 #if MIN_VERSION_template_haskell(2,11,0)
-    let dataDec = DataD [] tyNameF varsF Nothing consF [ConT functorTypeName, ConT foldableTypeName, ConT traversableTypeName]
+              NewtypeD [] tyNameF varsF Nothing conF [ConT functorTypeName, ConT foldableTypeName, ConT traversableTypeName]
+          _ ->
+              DataD [] tyNameF varsF Nothing consF [ConT functorTypeName, ConT foldableTypeName, ConT traversableTypeName]
 #else
-    let dataDec = DataD [] tyNameF varsF consF [functorTypeName, foldableTypeName, traversableTypeName]
+              NewtypeD [] tyNameF varsF conF [functorTypeName, foldableTypeName, traversableTypeName]
+          _ ->
+              DataD [] tyNameF varsF consF [functorTypeName, foldableTypeName, traversableTypeName]
 #endif
 
     -- type instance Base
