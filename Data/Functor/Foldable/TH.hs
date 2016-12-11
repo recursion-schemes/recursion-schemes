@@ -60,11 +60,10 @@ import Paths_recursion_schemes (version)
 -- /Notes:/
 --
 -- 'makeBaseFunctor' works properly only with ADTs.
--- Existentials and GADTs etc. may work, if the recursion is parametric.
+-- Existentials and GADTs aren't supported,
+-- as we don't try to de better than
+-- <https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/glasgow_exts.html#deriving-functor-instances GHC's DeriveFunctor>.
 --
--- /TODO:/
---
--- make GADTs work
 makeBaseFunctor :: Name -> DecsQ
 makeBaseFunctor = makeBaseFunctorWith baseRules
 
