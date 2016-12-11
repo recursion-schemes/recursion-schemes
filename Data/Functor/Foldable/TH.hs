@@ -2,8 +2,11 @@
 module Data.Functor.Foldable.TH
   ( makeBaseFunctor
   , makeBaseFunctorWith
-  , BaseRules (..)
+  , BaseRules
   , baseRules
+  , baseRulesType
+  , baseRulesCon
+  , baseRulesField
   ) where
 
 import Control.Applicative as A
@@ -29,6 +32,8 @@ import Paths_recursion_schemes (version)
 --     | Add (Expr a) (Expr a)
 --     | Expr a :* [Expr a]
 --   deriving (Show)
+--
+-- 'makeBaseFunctor' ''Expr
 -- @
 --
 -- will create
@@ -61,7 +66,7 @@ import Paths_recursion_schemes (version)
 --
 -- 'makeBaseFunctor' works properly only with ADTs.
 -- Existentials and GADTs aren't supported,
--- as we don't try to de better than
+-- as we don't try to do better than
 -- <https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/glasgow_exts.html#deriving-functor-instances GHC's DeriveFunctor>.
 --
 makeBaseFunctor :: Name -> DecsQ
@@ -87,6 +92,24 @@ baseRules = BaseRules
     , _baseRulesCon   = toFName
     , _baseRulesField = toFName
     }
+
+-- | How to name the base functor type.
+--
+-- Default is to prepened @F@ or @$@.
+baseRulesType :: Functor f => ((Name -> Name) -> f (Name -> Name)) -> BaseRules -> f BaseRules
+baseRulesType f rules = (\x -> rules { _baseRulesType = x }) <$> f (_baseRulesType rules)
+
+-- | How to rename the base functor type constructors.
+--
+-- Default is to prepened @F@ or @$@.
+baseRulesCon :: Functor f => ((Name -> Name) -> f (Name -> Name)) -> BaseRules -> f BaseRules
+baseRulesCon f rules = (\x -> rules { _baseRulesCon = x }) <$> f (_baseRulesCon rules)
+
+-- | How to rename the base functor type field names (in records).
+--
+-- Default is to prepened @F@ or @$@.
+baseRulesField :: Functor f => ((Name -> Name) -> f (Name -> Name)) -> BaseRules -> f BaseRules
+baseRulesField f rules = (\x -> rules { _baseRulesField = x }) <$> f (_baseRulesField rules)
 
 toFName :: Name -> Name
 toFName = mkName . f . nameBase
