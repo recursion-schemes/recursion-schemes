@@ -14,6 +14,10 @@ import Language.Haskell.TH
 import Language.Haskell.TH.Syntax (mkNameG_tc, mkNameG_v)
 import Data.Char (GeneralCategory (..), generalCategory)
 import Data.Orphans ()
+#ifndef CURRENT_PACKAGE_KEY
+import Data.Version (showVersion)
+import Paths_recursion_schemes (version)
+#endif
 
 -- | Build base functor with a sensible default configuration.
 --

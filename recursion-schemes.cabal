@@ -59,6 +59,9 @@ library
     exposed-modules:
       Data.Functor.Foldable.TH
 
+    other-modules:
+      Paths_recursion_schemes
+
   ghc-options: -Wall
 
 test-suite Expr
