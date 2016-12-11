@@ -86,6 +86,7 @@ data BaseRules = BaseRules
     , _baseRulesField :: Name -> Name
     }
 
+-- | Default 'BaseRules': prepend @F@ or @$@ to data type, constructors and field names.
 baseRules :: BaseRules
 baseRules = BaseRules
     { _baseRulesType  = toFName
