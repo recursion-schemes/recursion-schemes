@@ -1,3 +1,6 @@
+## 5.0.1
+* Add `Data.Functor.Foldable.TH` module, which provides derivation of base functors via Template Haskell.
+
 ## 5
 * Renamed `Foldable` to `Recursive` and `Unfoldable` to `Corecursive`. With `Foldable` in `Prelude` in GHC 7.10+, having a needlessly conflicting name seemed silly.
 * Add support for GHC-8.0.1
