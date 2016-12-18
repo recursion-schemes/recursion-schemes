@@ -4,8 +4,10 @@ module Main where
 
 import Data.Functor.Foldable
 import Data.Functor.Foldable.TH
+import Language.Haskell.TH
 import Data.List (foldl')
 import Test.HUnit
+import Data.Functor.Identity
 
 data Expr a
     = Lit a
@@ -14,6 +16,13 @@ data Expr a
   deriving (Show)
 
 makeBaseFunctor ''Expr
+
+data Expr2 a
+    = Lit2 a
+    | Add2 (Expr2 a) (Expr2 a)
+  deriving (Show)
+
+makeBaseFunctorWith (runIdentity $ baseRulesCon (\_-> Identity $ mkName . (++ "'") . nameBase) baseRules) ''Expr2
 
 expr1 :: Expr Int
 expr1 = Add (Lit 2) (Lit 3 :* [Lit 4])
