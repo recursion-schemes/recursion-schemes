@@ -86,7 +86,7 @@ data BaseRules = BaseRules
     , _baseRulesField :: Name -> Name
     }
 
--- | Default 'BaseRules': prepend @F@ or @$@ to data type, constructors and field names.
+-- | Default 'BaseRules': append @F@ or @$@ to data type, constructors and field names.
 baseRules :: BaseRules
 baseRules = BaseRules
     { _baseRulesType  = toFName
@@ -96,19 +96,19 @@ baseRules = BaseRules
 
 -- | How to name the base functor type.
 --
--- Default is to prepened @F@ or @$@.
+-- Default is to append @F@ or @$@.
 baseRulesType :: Functor f => ((Name -> Name) -> f (Name -> Name)) -> BaseRules -> f BaseRules
 baseRulesType f rules = (\x -> rules { _baseRulesType = x }) <$> f (_baseRulesType rules)
 
 -- | How to rename the base functor type constructors.
 --
--- Default is to prepened @F@ or @$@.
+-- Default is to append @F@ or @$@.
 baseRulesCon :: Functor f => ((Name -> Name) -> f (Name -> Name)) -> BaseRules -> f BaseRules
 baseRulesCon f rules = (\x -> rules { _baseRulesCon = x }) <$> f (_baseRulesCon rules)
 
 -- | How to rename the base functor type field names (in records).
 --
--- Default is to prepened @F@ or @$@.
+-- Default is to append @F@ or @$@.
 baseRulesField :: Functor f => ((Name -> Name) -> f (Name -> Name)) -> BaseRules -> f BaseRules
 baseRulesField f rules = (\x -> rules { _baseRulesField = x }) <$> f (_baseRulesField rules)
 
@@ -124,14 +124,14 @@ toFName = mkName . f . nameBase
 makePrimForDec :: BaseRules -> Dec -> DecsQ
 makePrimForDec rules dec = case dec of
 #if MIN_VERSION_template_haskell(2,11,0)
-  DataD    _ tyName vars _ cons _ -> do
+  DataD    _ tyName vars _ cons _ ->
     makePrimForDec' rules False tyName vars cons
-  NewtypeD _ tyName vars _ con _ -> do
+  NewtypeD _ tyName vars _ con _ ->
     makePrimForDec' rules True tyName vars [con]
 #else
   DataD    _ tyName vars cons _ ->
     makePrimForDec' rules False tyName vars cons
-  NewtypeD _ tyName vars con _ -> do
+  NewtypeD _ tyName vars con _ ->
     makePrimForDec' rules True tyName vars [con]
 #endif
   _ -> fail "makeFieldOptics: Expected data type-constructor"
@@ -180,7 +180,7 @@ makePrimForDec' rules isNewtype tyName vars cons = do
     -- instance Recursive
     args <- (traverse . traverse . traverse) (\_ -> newName "x") fieldCons
 
-    let projDec = FunD projectValName (mkMorphism id toFName args)
+    let projDec = FunD projectValName (mkMorphism id (_baseRulesCon rules) args)
 #if MIN_VERSION_template_haskell(2,11,0)
     let recursiveDec = InstanceD Nothing [] (ConT recursiveTypeName `AppT` s) [projDec]
 #else
@@ -188,7 +188,7 @@ makePrimForDec' rules isNewtype tyName vars cons = do
 #endif
 
     -- instance Corecursive
-    let embedDec = FunD embedValName (mkMorphism toFName id args)
+    let embedDec = FunD embedValName (mkMorphism (_baseRulesCon rules) id args)
 #if MIN_VERSION_template_haskell(2,11,0)
     let corecursiveDec = InstanceD Nothing [] (ConT corecursiveTypeName `AppT` s) [embedDec]
 #else
@@ -341,7 +341,7 @@ isSymbolChar c = not (isPuncChar c) && case generalCategory c of
     ModifierSymbol          -> True
     OtherSymbol             -> True
     DashPunctuation         -> True
-    OtherPunctuation        -> not (c `elem` "'\"")
+    OtherPunctuation        -> c `notElem` "'\""
     ConnectorPunctuation    -> c /= '_'
     _                       -> False
 
