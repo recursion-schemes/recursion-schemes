@@ -54,13 +54,16 @@ main = do
     "bar" @=? cata lAlg lBar
     lBar @=? ana lCoalg "bar"
 
-    let expr3 = Add2 (Lit2 (21 :: Int)) $ Add2 (Lit2 11) (Lit2 10)
+    let expr3 = Add2 (Lit2 21) $ Add2 (Lit2 11) (Lit2 10)
     42 @=? cata evalAlg2 expr3
   where
+    -- Type signatures to test name generation
+    evalAlg :: ExprF Int Int -> Int
     evalAlg (LitF x)   = x
     evalAlg (AddF x y) = x + y
     evalAlg (x :*$ y) = foldl' (*) x y
 
+    evalAlg2 :: Expr2_ Int Int -> Int
     evalAlg2 (Lit2' x)   = x
     evalAlg2 (Add2' x y) = x + y
 
