@@ -12,6 +12,8 @@
 -- Polymorphic typeable
 #define HAS_POLY_TYPEABLE MIN_VERSION_base(4,7,0)
 
+#define HAS_NATURAL (__GLASGOW_HASKELL__ >= 710)
+
 #ifdef __GLASGOW_HASKELL__
 {-# LANGUAGE DeriveDataTypeable #-}
 #if __GLASGOW_HASKELL__ >= 800
@@ -128,7 +130,9 @@ import GHC.Generics (Generic)
 import GHC.Generics (Generic1)
 #endif
 #endif
-
+#if HAS_NATURAL
+import Numeric.Natural
+#endif
 import Data.Monoid (Monoid (..))
 import Prelude
 
@@ -334,6 +338,15 @@ instance Recursive (NonEmpty a) where
   project (x:|xs) = NonEmptyF x $ nonEmpty xs
 instance Corecursive (NonEmpty a) where
   embed = (:|) <$> NEF.head <*> (maybe [] toList <$> NEF.tail)
+
+#if HAS_NATURAL
+type instance Base Natural = Maybe
+instance Recursive Natural where
+  project 0 = Nothing
+  project n = Just (n - 1)
+instance Corecursive Natural where
+  embed = maybe 0 (+1)
+#endif
 
 -- | Cofree comonads are Recursive/Corecursive
 type instance Base (Cofree f a) = CofreeF f a
