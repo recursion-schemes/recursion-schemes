@@ -50,6 +50,9 @@ library
   if impl(ghc < 7.5)
     build-depends: ghc-prim
 
+  if impl(ghc < 7.10)
+    build-depends: nats
+    
   exposed-modules:
     Data.Functor.Base
     Data.Functor.Foldable
