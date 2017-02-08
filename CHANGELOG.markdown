@@ -1,5 +1,6 @@
-## 5.0.1.1
+## 5.0.2
 * Fix Template Haskell derivation with non-default type renamer.
+* Add `Recursive` and `Corecursive Natural` instances, with `Base Natural = Maybe`.
 
 ## 5.0.1
 * Add `Data.Functor.Foldable.TH` module, which provides derivation of base functors via Template Haskell.
