@@ -128,7 +128,7 @@ import GHC.Generics (Generic)
 import GHC.Generics (Generic1)
 #endif
 #endif
-
+import Numeric.Natural
 import Data.Monoid (Monoid (..))
 import Prelude
 
@@ -334,6 +334,13 @@ instance Recursive (NonEmpty a) where
   project (x:|xs) = NonEmptyF x $ nonEmpty xs
 instance Corecursive (NonEmpty a) where
   embed = (:|) <$> NEF.head <*> (maybe [] toList <$> NEF.tail)
+
+type instance Base Natural = Maybe
+instance Recursive Natural where
+  project 0 = Nothing
+  project n = Just (n - 1)
+instance Corecursive Natural where
+  embed = maybe 0 (+1)
 
 -- | Cofree comonads are Recursive/Corecursive
 type instance Base (Cofree f a) = CofreeF f a
