@@ -1,4 +1,5 @@
 ## 5.0.2
+* Support GHC-8.2.1
 * Fix Template Haskell derivation with non-default type renamer.
 * Add `Recursive` and `Corecursive Natural` instances, with `Base Natural = Maybe`.
 
