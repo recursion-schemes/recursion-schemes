@@ -159,15 +159,30 @@ makePrimForDec' rules isNewtype tyName vars cons = do
 
     -- Data definition
     let dataDec = case consF of
-          [conF] | isNewtype ->
 #if MIN_VERSION_template_haskell(2,11,0)
-              NewtypeD [] tyNameF varsF Nothing conF [ConT functorTypeName, ConT foldableTypeName, ConT traversableTypeName]
-          _ ->
-              DataD [] tyNameF varsF Nothing consF [ConT functorTypeName, ConT foldableTypeName, ConT traversableTypeName]
+            [conF] | isNewtype ->
+                NewtypeD [] tyNameF varsF Nothing conF deriveds
+            _ ->
+                DataD [] tyNameF varsF Nothing consF deriveds
 #else
-              NewtypeD [] tyNameF varsF conF [functorTypeName, foldableTypeName, traversableTypeName]
-          _ ->
-              DataD [] tyNameF varsF consF [functorTypeName, foldableTypeName, traversableTypeName]
+            [conF] | isNewtype ->
+                NewtypeD [] tyNameF varsF conF deriveds
+            _ ->
+                DataD [] tyNameF varsF consF deriveds
+#endif
+          where
+            deriveds =
+#if MIN_VERSION_template_haskell(2,12,0)
+              [DerivClause Nothing 
+                [ ConT functorTypeName
+                , ConT foldableTypeName
+                , ConT traversableTypeName ]]
+#elif MIN_VERSION_template_haskell(2,11,0)
+              [ ConT functorTypeName
+              , ConT foldableTypeName
+              , ConT traversableTypeName ]
+#else
+              [functorTypeName, foldableTypeName, traversableTypeName]
 #endif
 
     -- type instance Base
