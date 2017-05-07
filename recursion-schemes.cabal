@@ -13,7 +13,7 @@ copyright:     Copyright (C) 2008-2015 Edward A. Kmett
 synopsis:      Generalized bananas, lenses and barbed wire
 description:   Generalized bananas, lenses and barbed wire
 
-tested-with:   GHC==7.4.2, GHC==7.6.3, GHC==7.8.4, GHC==7.10.3, GHC==8.0.2
+tested-with:   GHC==7.4.2, GHC==7.6.3, GHC==7.8.4, GHC==7.10.3, GHC==8.0.2, GHC==8.2.1
 
 build-type:    Simple
 extra-source-files: .travis.yml CHANGELOG.markdown .gitignore README.markdown
@@ -58,7 +58,7 @@ library
     Data.Functor.Foldable
 
   if flag(template-haskell)
-    build-depends: template-haskell >= 2.5.0.0 && < 2.12, base-orphans >= 0.5.4 && <0.7
+    build-depends: template-haskell >= 2.5.0.0 && < 2.13, base-orphans >= 0.5.4 && <0.7
     exposed-modules:
       Data.Functor.Foldable.TH
 
@@ -74,7 +74,7 @@ test-suite Expr
   ghc-options: -Wall -threaded
   build-depends:
     base,
-    HUnit <1.6,
+    HUnit <1.7,
     recursion-schemes,
-    template-haskell >= 2.5.0.0 && < 2.12,
+    template-haskell >= 2.5.0.0 && < 2.13,
     transformers     >= 0.2     && < 1
