@@ -81,7 +81,7 @@ module Data.Functor.Foldable
   , refix
   -- * Common names
   , fold, gfold
-  , unfold, gunfold
+  , Data.Functor.Foldable.unfold, gunfold
   , refold, grefold
   -- * Mendler-style
   , mcata
