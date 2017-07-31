@@ -14,6 +14,7 @@ import Data.Traversable as T
 import Data.Bifunctor (first)
 import Data.Functor.Identity
 import Language.Haskell.TH
+import Language.Haskell.TH.Datatype (resolveTypeSynonyms)
 import Language.Haskell.TH.Syntax (mkNameG_tc, mkNameG_v)
 import Data.Char (GeneralCategory (..), generalCategory)
 import Data.Orphans ()
@@ -149,13 +150,16 @@ makePrimForDec' rules isNewtype tyName vars cons = do
     let r = VarT rName
     -- Vars
     let varsF = vars ++ [PlainTV rName]
-    let fieldCons = map normalizeConstructor cons
+
+    -- #33
+    cons' <- traverse (conTypeTraversal resolveTypeSynonyms) cons
+    let fieldCons = map normalizeConstructor cons'
 
     let consF
           = conNameMap (_baseRulesCon rules)
           . conFieldNameMap (_baseRulesField rules)
           . conTypeMap (substType s r)
-          <$> cons
+          <$> cons'
 
     -- Data definition
     let dataDec = case consF of
@@ -173,7 +177,7 @@ makePrimForDec' rules isNewtype tyName vars cons = do
           where
             deriveds =
 #if MIN_VERSION_template_haskell(2,12,0)
-              [DerivClause Nothing 
+              [DerivClause Nothing
                 [ ConT functorTypeName
                 , ConT foldableTypeName
                 , ConT traversableTypeName ]]
