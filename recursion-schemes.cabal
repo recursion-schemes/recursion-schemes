@@ -47,6 +47,7 @@ library
     comonad              >= 4       && < 6,
     free                 >= 4       && < 5,
     semigroups           >= 0.8.3.1 && < 1,
+    th-abstraction       >= 0.2     && < 1,
     transformers         >= 0.2     && < 1,
     transformers-compat  >= 0.3     && < 1
 

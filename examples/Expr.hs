@@ -44,6 +44,13 @@ cons x xs = L (Just (x, xs))
 nil :: L a
 nil = L Nothing
 
+-- Test #33
+data Tree a = Node {rootLabel :: a, subForest :: Forest a}
+  deriving (Show)
+type Forest a = [Tree a]
+
+makeBaseFunctor ''Tree
+
 main :: IO ()
 main = do
     let expr2 = ana divCoalg 55 :: Expr Int
@@ -56,6 +63,9 @@ main = do
 
     let expr3 = Add2 (Lit2 21) $ Add2 (Lit2 11) (Lit2 10)
     42 @=? cata evalAlg2 expr3
+
+    let expr4 = Node 5 [Node 6 [Node 7 []], Node 8 [Node 9 []]]
+    35 @=? cata treeAlg expr4
   where
     -- Type signatures to test name generation
     evalAlg :: ExprF Int Int -> Int
@@ -79,3 +89,6 @@ main = do
 
     lCoalg []       = LF { getLF = Nothing } -- to test field renamer
     lCoalg (x : xs) = LF { getLF = Just (x, xs) }
+
+    treeAlg :: TreeF Int Int -> Int
+    treeAlg (NodeF r f) = r + sum f
