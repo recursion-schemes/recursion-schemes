@@ -9,6 +9,7 @@ module Data.Functor.Foldable.TH
   , baseRulesField
   ) where
 
+import Control.Applicative as A
 import Control.Monad
 import Data.Traversable as T
 import Data.Functor.Identity
@@ -216,7 +217,7 @@ makePrimForDI' rules isNewtype tyName vars cons = do
 #endif
 
     -- Combine
-    pure [dataDec, baseDec, recursiveDec, corecursiveDec]
+    A.pure [dataDec, baseDec, recursiveDec, corecursiveDec]
 
 -- | makes clauses to rename constructors
 mkMorphism
