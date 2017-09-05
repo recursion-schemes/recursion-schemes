@@ -692,6 +692,13 @@ zygoHistoPrepro
   -> a
 zygoHistoPrepro f g t = gprepro (distZygoT f distHisto) g t
 
+
+-- | Natural Transformation
+-- Also known as homomorphisms
+
+natFix :: Recursive t => (Base t (Fix f) -> f (Fix f)) -> t -> Fix f
+natFix f = cata (Fix . f)
+
 -------------------------------------------------------------------------------
 -- Not exposed anywhere
 -------------------------------------------------------------------------------
