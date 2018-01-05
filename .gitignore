@@ -19,3 +19,11 @@ cabal.sandbox.config
 codex.tags
 src/highlight.js
 src/style.css
+*.prof
+*.aux
+*.hp
+*.eventlog
+cabal.project.local
+cabal.project.local~
+.HTF/
+.ghc.environment.*
