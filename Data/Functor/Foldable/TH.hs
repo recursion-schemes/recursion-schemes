@@ -56,7 +56,7 @@ import Paths_recursion_schemes (version)
 -- instance 'Corecursive' (Expr a) where
 --     'embed' (LitF x)   = Lit x
 --     'embed' (AddF x y) = Add x y
---     'embed' (x :*$ y)  = x :*$ y
+--     'embed' (x :*$ y)  = x :* y
 -- @
 --
 -- @
