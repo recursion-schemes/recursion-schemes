@@ -1,6 +1,6 @@
 {-# LANGUAGE CPP #-}
 
-#define EXPLICIT_DICT_FUNCTOR_CLASSES (MIN_VERSION_base(4,9,0) || MIN_VERSION_transformers(0,5,0) || (MIN_VERSION_transformers_compat(0,5,0) && !MIN_VERSION_transformers(0,4,0)))
+#define EXPLICIT_DICT_FUNCTOR_CLASSES (MIN_VERSION_base(4,9,0) || MIN_VERSION_transformers(0,5,0))
 
 #define HAS_GENERIC (__GLASGOW_HASKELL__ >= 702)
 #define HAS_GENERIC1 (__GLASGOW_HASKELL__ >= 706)
