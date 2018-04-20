@@ -31,8 +31,8 @@ flag template-haskell
   default: True
 
 library
-  extensions: CPP
   other-extensions:
+    CPP
     TypeFamilies
     Rank2Types
     FlexibleContexts
@@ -42,33 +42,43 @@ library
     UndecidableInstances
 
   build-depends:
-    base                 >= 4       && < 5,
+    base                 >= 4.5     && < 5,
     comonad              >= 4       && < 6,
     free                 >= 4       && < 6,
-    transformers         >= 0.3     && < 1
+    transformers         >= 0.3.0.0 && < 1
 
-  if impl(ghc < 8.2)
+  if !impl(ghc >= 8.2)
     build-depends: bifunctors >= 4 && < 6
 
-  if flag(template-haskell)
-    build-depends: th-abstraction >= 0.2.4 && < 1
-
-  if impl(ghc < 8.0)
-    build-depends: semigroups >= 0.8.3.1 && < 1
+  if !impl(ghc >= 8.0)
+    build-depends: semigroups >= 0.10 && < 1
 
   if impl(ghc < 7.5)
     build-depends: ghc-prim
 
-  if impl(ghc < 7.10)
-    build-depends: nats
-    build-depends: transformers-compat
+  -- Following two conditionals aren't inverses (there are other compilers than GHC)
+  --
+  -- We enforce the fact that with GHC-7.10
+  -- we have at least transformers-0.4.2.0 (the bundled one)
+  -- which has 'Data.Functor.Classes' module. (transformers-0.3 doesn't have)
+  if impl(ghc >= 7.10)
+    build-depends:
+      transformers         >= 0.4.2.0
+
+  if !impl(ghc >= 7.10)
+    build-depends:
+      nats,
+      transformers-compat  >= 0.3     && < 1
 
   exposed-modules:
     Data.Functor.Base
     Data.Functor.Foldable
 
   if flag(template-haskell)
-    build-depends: template-haskell >= 2.5.0.0 && < 2.14, base-orphans >= 0.5.4 && <0.8
+    build-depends:
+      template-haskell >= 2.5.0.0 && < 2.14,
+      base-orphans     >= 0.5.4   && < 0.8,
+      th-abstraction   >= 0.2.4   && < 1
     exposed-modules:
       Data.Functor.Foldable.TH
 
