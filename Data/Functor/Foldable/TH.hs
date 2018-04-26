@@ -1,4 +1,4 @@
-{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE CPP, Rank2Types #-}
 module Data.Functor.Foldable.TH
   ( makeBaseFunctor
   , makeBaseFunctorWith

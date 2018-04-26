@@ -4,7 +4,13 @@
 -- - base-4.9
 -- - transformers >= 0.5
 -- - transformes-compat >= 0.5 when transformers aren't 0.4
-#define EXPLICIT_DICT_FUNCTOR_CLASSES (MIN_VERSION_base(4,9,0) || MIN_VERSION_transformers(0,5,0))
+--
+-- We don't always depend on transformers-compat, so we need a shim for its version check.
+#ifndef MIN_VERSION_transformers_compat
+#define MIN_VERSION_transformers_compat(x,y,z) 0
+#endif
+
+#define EXPLICIT_DICT_FUNCTOR_CLASSES (MIN_VERSION_base(4,9,0) || MIN_VERSION_transformers(0,5,0) || (MIN_VERSION_transformers_compat(0,5,0) && !MIN_VERSION_transformers(0,4,0)))
 
 #define HAS_GENERIC (__GLASGOW_HASKELL__ >= 702)
 #define HAS_GENERIC1 (__GLASGOW_HASKELL__ >= 706)
