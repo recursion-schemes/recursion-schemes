@@ -1,14 +1,5 @@
 {-# LANGUAGE CPP #-}
-
--- See Data.Functor.Foldable for explanation
-#ifndef MIN_VERSION_transformers_compat
-#define MIN_VERSION_transformers_compat(x,y,z) 0
-#endif
-
-#define EXPLICIT_DICT_FUNCTOR_CLASSES (MIN_VERSION_base(4,9,0) || MIN_VERSION_transformers(0,5,0) || (MIN_VERSION_transformers_compat(0,5,0) && !MIN_VERSION_transformers(0,4,0)))
-
-#define HAS_GENERIC (__GLASGOW_HASKELL__ >= 702)
-#define HAS_GENERIC1 (__GLASGOW_HASKELL__ >= 706)
+#include "recursion-schemes-common.h"
 
 #ifdef __GLASGOW_HASKELL__
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -37,7 +28,7 @@ import Data.Monoid
 
 import Data.Functor.Classes
   ( Eq1(..), Ord1(..), Show1(..), Read1(..)
-#if EXPLICIT_DICT_FUNCTOR_CLASSES
+#ifdef LIFTED_FUNCTOR_CLASSES
   , Eq2(..), Ord2(..), Show2(..), Read2(..)
 #endif
   )
@@ -62,7 +53,7 @@ data NonEmptyF a b = NonEmptyF { head :: a, tail :: Maybe b }
 #endif
           )
 
-#if EXPLICIT_DICT_FUNCTOR_CLASSES
+#ifdef LIFTED_FUNCTOR_CLASSES
 instance Eq2 NonEmptyF where
   liftEq2 f g (NonEmptyF a mb) (NonEmptyF a' mb') = f a a' && liftEq g mb mb'
 
