@@ -52,16 +52,11 @@ module Data.Functor.Foldable
   -- * Folding
   , Recursive(..)
   -- ** Combinators
-  , gapo
   , gcata
   , zygo
   , gzygo
   , histo
   , ghisto
-  , futu
-  , gfutu
-  , chrono
-  , gchrono
   -- ** Distributive laws
   , distCata
   , distPara
@@ -70,20 +65,25 @@ module Data.Functor.Foldable
   , distZygoT
   , distHisto
   , distGHisto
-  , distFutu
-  , distGFutu
   -- * Unfolding
   , Corecursive(..)
   -- ** Combinators
+  , gapo
   , gana
+  , futu
+  , gfutu
   -- ** Distributive laws
   , distAna
   , distApo
   , distGApo
   , distGApoT
+  , distFutu
+  , distGFutu
   -- * Refolding
   , hylo
   , ghylo
+  , chrono
+  , gchrono
   -- ** Changing representation
   , refix
   -- * Common names
