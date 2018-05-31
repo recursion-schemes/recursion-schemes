@@ -149,23 +149,133 @@ import qualified Data.Bitraversable as Bi
 import           Data.Functor.Base hiding (head, tail)
 import qualified Data.Functor.Base as NEF (NonEmptyF(..))
 
+-- | Obtain the base functor for a recursive datatype.
+--
+-- The core idea of this library is that instead of writing recursive functions
+-- on a recursive datatype, we prefer to write non-recursive functions on a
+-- related, non-recursive datatype we call the "base functor".
+--
+-- For example, @[a]@ is a recursive type, and its corresponding base functor is
+-- @ListF a@:
+--
+-- > data ListF a b = Nil | Cons a b
+-- > type instance Base [a] = ListF a
+--
+-- The relationship between those two types is that if we replace @b@ with
+-- @ListF a@, we obtain a type which is isomorphic to @[a]@.
 type family Base t :: * -> *
 
+-- | A recursive datatype which can be unrolled one recursion layer at a time.
+--
+-- For example, a value of type @[a]@ can be unrolled into a @ListF a [a]@. If
+-- that unrolled value is a 'Cons', it contains another @[a]@ which can be
+-- unrolled as well, and so on.
+--
+-- Typically, 'Recursive' types also have a 'Corecursive' instance, in which
+-- case 'project' and 'embed' are inverses.
 class Functor (Base t) => Recursive t where
+  -- | Unroll a single recursion layer.
+  --
+  -- >>> project [1,2,3]
+  -- Cons 1 [2,3]
   project :: t -> Base t t
 
+  -- | A generalization of 'foldr'. The elements of the base functor, called the
+  -- "recursive positions", give the result of folding the sub-tree at that
+  -- position.
+  --
+  -- > -- |
+  -- > -- >>> sum [1,2,3]
+  -- > -- 6
+  -- > sum :: [Int] -> Int
+  -- > sum = cata sumF
+  -- >
+  -- > sumF :: ListF Int Int -> Int
+  -- > sumF Nil          = 0
+  -- > sumF (Cons x acc) = x + acc
   cata :: (Base t a -> a) -- ^ a (Base t)-algebra
        -> t               -- ^ fixed point
        -> a               -- ^ result
   cata f = c where c = f . fmap c . project
 
+  -- | A variant of 'cata' in which recursive positions also include the
+  -- original sub-tree, in addition to the result of folding that sub-tree.
+  --
+  -- Useful when matching on a pattern which spans more than one recursion step:
+  --
+  -- > -- |
+  -- > -- >>> splitAtCommaSpace "one, two, three"
+  -- > -- Just ("one","two, three")
+  -- > splitAtCommaSpace :: String -> Maybe (String,String)
+  -- > splitAtCommaSpace = para splitAtCommaSpaceF
+  -- >
+  -- > splitAtCommaSpaceF :: ListF Char (String, Maybe (String,String))
+  -- >                    -> Maybe (String,String)
+  -- > splitAtCommaSpaceF (Cons ',' (' ':ys, _))     = Just ([], ys)
+  -- > splitAtCommaSpaceF (Cons x (_, Just (xs,ys))) = Just (x:xs, ys)
+  -- > splitAtCommaSpaceF _                          = Nothing
   para :: (Base t (t, a) -> a) -> t -> a
   para t = p where p x = t . fmap ((,) <*> p) $ project x
 
+  -- | A generalized paramorphism. Like 'para', each recursive position gives
+  -- the result of the fold on its sub-tree and also the sub-tree itself.
+  -- Depending on the distributive law, more information about that sub-tree may
+  -- also be provided.
+  --
+  -- For example, we could build a "zygomorphic paramorphism", in which the
+  -- result of a 'cata' is also provided:
+  --
+  -- > -- |
+  -- > -- >>> calc "subtract 2; multiply by 2; add 1" <*> pure 42
+  -- > -- Just 81
+  -- > calc :: String -> Maybe (Int -> Int)
+  -- > calc = gpara (distZygo parseNumberF) calcF
+  -- >
+  -- > parseDigit :: Char -> Maybe Int
+  -- > parseDigit c = (ord c - ord '0') <$ guard (c `elem` ['0'..'9'])
+  -- >
+  -- > parseNumberF :: ListF Char (Maybe Int) -> Maybe Int
+  -- > parseNumberF Nil              = Nothing
+  -- > parseNumberF (Cons ';' _)     = Nothing
+  -- > parseNumberF (Cons c Nothing) = parseDigit c
+  -- > parseNumberF (Cons c maybeY)
+  -- >   | c `elem` ['0'..'9'] = (\x y -> 10 * x + y) <$> parseDigit c <*> maybeY
+  -- >   | otherwise           = maybeY
+  -- >
+  -- > calcF :: ListF Char (EnvT String
+  -- >                           ((,) (Maybe Int))
+  -- >                           (Maybe (Int -> Int)))
+  -- >       -> Maybe (Int -> Int)
+  -- > calcF Nil = Just id
+  -- > calcF (Cons c (EnvT cs (maybeX,maybeF)))
+  -- >   | "add "         `isPrefixOf` (c:cs) = (\f x -> f . (+ x))        <$> maybeF <*> maybeX
+  -- >   | "subtract "    `isPrefixOf` (c:cs) = (\f x -> f . (subtract x)) <$> maybeF <*> maybeX
+  -- >   | "multiply by " `isPrefixOf` (c:cs) = (\f x -> f . (* x))        <$> maybeF <*> maybeX
+  -- >   | otherwise                          = maybeF
   gpara :: (Corecursive t, Comonad w) => (forall b. Base t (w b) -> w (Base t b)) -> (Base t (EnvT t w a) -> a) -> t -> a
   gpara t = gzygo embed t
 
-  -- | Fokkinga's prepromorphism
+  -- | Fokkinga's prepromorphism. Applies the natural transformation /n/ times
+  -- to the base functors at depth /n/, then collapses the results using a
+  -- 'cata'. The outermost base functor has depth zero.
+  --
+  -- Useful for indenting sub-trees in a pretty-printer:
+  --
+  -- > -- |
+  -- > -- >>> putStr $ drawList ["foo","bar","baz"]
+  -- > -- foo
+  -- > --   bar
+  -- > --     baz
+  -- > drawList :: [String] -> String
+  -- > drawList = prepro indent drawListF
+  -- >
+  -- > indent :: ListF String a -> ListF String a
+  -- > indent Nil        = Nil
+  -- > indent (Cons s x) = Cons ("  " ++ s) x
+  -- >
+  -- > drawListF :: ListF String String -> String
+  -- > drawListF Nil               = ""
+  -- > drawListF (Cons line lines) = line ++ "\n" ++ lines
   prepro
     :: Corecursive t
     => (forall b. Base t b -> Base t b)
@@ -174,7 +284,56 @@ class Functor (Base t) => Recursive t where
     -> a
   prepro e f = c where c = f . fmap (c . cata (embed . e)) . project
 
-  --- | A generalized prepromorphism
+  -- | A generalized prepromorphism. Like 'prepro', the natural transformation
+  -- is applied /n/ times to the base functors at depth /n/. The results are
+  -- then folded using the operation corresponding to the given distributive
+  -- law.
+  --
+  -- For example, we could build a "zygomorphic prepromorphism", which folds the
+  -- results using a 'zygo':
+  --
+  -- > type Tree a = Fix (TreeF a)
+  -- > data TreeF a b = Leaf a | Branch b b
+  -- >   deriving Functor
+  -- >
+  -- > leaf :: a -> Tree a
+  -- > leaf = Fix . Leaf
+  -- >
+  -- > branch :: Tree a -> Tree a -> Tree a
+  -- > branch l r = Fix $ Branch l r
+  -- >
+  -- > -- |
+  -- > -- >>> let tree = ((leaf "0.1.1.1" `branch` leaf "0.1.1.2") `branch` leaf "0.1.2") `branch` (leaf "0.2.1" `branch` leaf "0.2.2")
+  -- > -- >>> putStrLn $ drawTree tree
+  -- > -- 0.
+  -- > --   0.1.
+  -- > --     0.1.1.
+  -- > --       0.1.1.1
+  -- > --       0.1.1.2
+  -- > --     0.1.2
+  -- > --   0.2.
+  -- > --     0.2.1
+  -- > --     0.2.2
+  -- > drawTree :: Tree String -> String
+  -- > drawTree = gprepro (distZygo mergeHeaders) indent drawTreeF
+  -- >
+  -- > indent :: TreeF String a -> TreeF String a
+  -- > indent (Leaf s) = Leaf ("  " ++ s)
+  -- > indent x        = x
+  -- >
+  -- > mergeHeaders :: TreeF String String -> String
+  -- > mergeHeaders (Leaf s) = s
+  -- > mergeHeaders (Branch s1 s2)
+  -- >   = drop 2
+  -- >   $ takeWhile (/= '\0')
+  -- >   $ zipWith (\c1 c2 -> if c1 == c2 then c1 else '\0') s1 s2
+  -- >
+  -- > drawTreeF :: TreeF String (String, String) -> String
+  -- > drawTreeF (Leaf s) = s
+  -- > drawTreeF (Branch (header1, s1) (header2, s2))
+  -- >   = mergeHeaders (Branch header1 header2) ++ "\n"
+  -- >  ++ s1 ++ "\n"
+  -- >  ++ s2
   gprepro
     :: (Corecursive t, Comonad w)
     => (forall b. Base t (w b) -> w (Base t b))
@@ -190,18 +349,74 @@ distPara = distZygo embed
 distParaT :: (Corecursive t, Comonad w) => (forall b. Base t (w b) -> w (Base t b)) -> Base t (EnvT t w a) -> EnvT t w (Base t a)
 distParaT t = distZygoT embed t
 
+-- | A recursive datatype which can be rolled up one recursion layer at a time.
+--
+-- For example, a value of type @ListF a [a]@ can be rolled up into a @[a]@.
+-- This @[a]@ can then be used in a 'Cons' to construct another @List F a [a]@,
+-- which can be rolled up as well, and so on.
+--
+-- Typically, 'Corecursive' types also have a 'Recursive' instance, in which
+-- case 'embed' and 'project' are inverses.
 class Functor (Base t) => Corecursive t where
+  -- | Roll up a single recursion layer.
+  --
+  -- >>> embed (Cons 1 [2,3])
+  -- [1,2,3]
   embed :: Base t t -> t
+
+  -- | A generalization of 'unfoldr'. The starting seed is expanded into a base
+  -- functor whose recursive positions contain more seeds, which are themselves
+  -- expanded, and so on.
+  --
+  -- > -- |
+  -- > -- >>> enumFromTo 1 4
+  -- > -- [1,2,3,4]
+  -- > enumFromTo :: Int -> Int -> [Int]
+  -- > enumFromTo lo hi = ana go lo where
+  -- >   go :: Int -> ListF Int Int
+  -- >   go i = if i > hi then Nil else Cons i (i+1)
   ana
     :: (a -> Base t a) -- ^ a (Base t)-coalgebra
     -> a               -- ^ seed
     -> t               -- ^ resulting fixed point
   ana g = a where a = embed . fmap a . g
 
+  -- | A variant of 'ana' in which recursive positions may contain a sub-tree
+  -- instead of a seed.
+  --
+  -- Useful for short-circuiting the remainder of the unfolding:
+  --
+  -- > -- |
+  -- > -- >>> mergeSortedLists [1,4,6,9] [2,4,6,7,10]
+  -- > -- [1,2,4,4,6,6,7,9,10]
+  -- > mergeSortedLists :: [Int] -> [Int] -> [Int]
+  -- > mergeSortedLists xs1 xs2 = apo mergeSortedListsF (xs1,xs2)
+  -- >
+  -- > mergeSortedListsF :: ([Int],[Int]) -> ListF Int (Either [Int] ([Int],[Int]))
+  -- > mergeSortedListsF ([], []) = Nil
+  -- > mergeSortedListsF ([], x:xs2) = Cons x $ Left xs2
+  -- > mergeSortedListsF (x:xs1, []) = Cons x $ Left xs1
+  -- > mergeSortedListsF (x1:xs1, x2:xs2)
+  -- >   | x1 <= x2  = Cons x1 $ Right (xs1, x2:xs2)
+  -- >   | otherwise = Cons x2 $ Right (x1:xs1, xs2)
   apo :: (a -> Base t (Either t a)) -> a -> t
   apo g = a where a = embed . (fmap (either id a)) . g
 
-  -- | Fokkinga's postpromorphism
+  -- | Fokkinga's postpromorphism. Uses an 'ana' on the seed, and then applies
+  -- the natural transformation /n/ times to the base functors produced at depth
+  -- /n/. The outermost base functor has depth zero.
+  --
+  -- > -- |
+  -- > -- >>> take 8 $ iterate (*2) 1
+  -- > -- [1,2,4,8,16,32,64,128]
+  -- > iterate :: (Int -> Int) -> Int -> [Int]
+  -- > iterate f = postpro apply go where
+  -- >   apply :: ListF Int b -> ListF Int b
+  -- >   apply Nil        = Nil
+  -- >   apply (Cons x y) = Cons (f x) y
+  -- >
+  -- >   go :: Int -> ListF Int Int
+  -- >   go x = Cons x x
   postpro
     :: Recursive t
     => (forall b. Base t b -> Base t b) -- natural transformation
@@ -210,7 +425,28 @@ class Functor (Base t) => Corecursive t where
     -> t
   postpro e g = a where a = embed . fmap (ana (e . project) . a) . g
 
-  -- | A generalized postpromorphism
+  -- | A generalized postpromorphism. The seed is expanded using the operation
+  -- corresponding to the given distributive law, and then like in 'postpro',
+  -- the natural transformation is applied /n/ times to the base functors at
+  -- depth /n/.
+  --
+  -- For example, we could expand the seed using a 'gapo':
+  --
+  -- > -- |
+  -- > -- >>> upThenFork 4
+  -- > -- [(1,1),(2,2),(3,3),(4,4),(5,3),(6,2),(7,1)]
+  -- > upThenFork :: Int -> [(Int,Int)]
+  -- > upThenFork n = gpostpro (distGApo down) incrementFst up 1 where
+  -- >   incrementFst :: ListF (Int,b) c -> ListF (Int,b) c
+  -- >   incrementFst Nil             = Nil
+  -- >   incrementFst (Cons (x, y) z) = Cons (1+x, y) z
+  -- >
+  -- >   up :: Int -> ListF (Int,Int) (Either Int Int)
+  -- >   up i = Cons (1,i) (if i == n then Left (n-1) else Right (i+1))
+  -- >
+  -- >   down :: Int -> ListF (Int,Int) Int
+  -- >   down 0 = Nil
+  -- >   down i = Cons (1,i) (i-1)
   gpostpro
     :: (Recursive t, Monad m)
     => (forall b. m (Base t b) -> Base t (m b)) -- distributive law
@@ -220,15 +456,37 @@ class Functor (Base t) => Corecursive t where
     -> t
   gpostpro k e g = a . return where a = embed . fmap (ana (e . project) . a . join) . k . liftM g
 
+-- | An optimized version of @cata f . ana g@.
+--
+-- Useful when your recursion structure is shaped like a particular recursive
+-- datatype, but you're neither consuming nor producing that recursive datatype.
+-- For example, the recursion structure of merge sort is a binary tree, but its
+-- input and output is a list, not a binary tree.
+--
+-- > -- |
+-- > -- >>> sort [1,5,2,8,4,9,8]
+-- > -- [1,2,4,5,8,8,9]
+-- > sort :: [Int] -> [Int]
+-- > sort = hylo merge split where
+-- >   split :: [Int] -> TreeF Int [Int]
+-- >   split [x] = Leaf x
+-- >   split xs  = uncurry Branch $ splitAt (length xs `div` 2) xs
+-- >
+-- >   merge :: TreeF Int [Int] -> [Int]
+-- >   merge (Leaf x)         = [x]
+-- >   merge (Branch xs1 xs2) = mergeSortedLists xs1 xs2
 hylo :: Functor f => (f b -> b) -> (a -> f a) -> a -> b
 hylo f g = h where h = f . fmap h . g
 
+-- | A friendlier name for 'cata'.
 fold :: Recursive t => (Base t a -> a) -> t -> a
 fold = cata
 
+-- | A friendlier name for 'ana'.
 unfold :: Corecursive t => (a -> Base t a) -> a -> t
 unfold = ana
 
+-- | A friendlier name for 'hylo'.
 refold :: Functor f => (f b -> b) -> (a -> f a) -> a -> b
 refold = hylo
 
@@ -405,7 +663,36 @@ type instance Base (Either a b) = Const (Either a b)
 instance Recursive (Either a b) where project = Const
 instance Corecursive (Either a b) where embed = getConst
 
--- | A generalized catamorphism
+-- | A generalized catamorphism. With the appropriate distributive law, it can
+-- be specialized to any fold: a 'cata', a 'para', a 'zygo', etc.
+--
+-- For example, we could build a version of 'zygo' in which the sub-trees are
+-- folded with a 'para' instead of a 'cata':
+--
+-- > -- |
+-- > -- >>> splitInThree "one, two, three, four"
+-- > -- Just ("one","two","three, four")
+-- > splitInThree :: String -> Maybe (String,String,String)
+-- > splitInThree = gcata (dist splitAtCommaSpaceF) splitInThreeF
+-- >
+-- > splitInThreeF :: ListF Char ( (String, Maybe (String,String))
+-- >                             , Maybe (String,String,String)
+-- >                             )
+-- >               -> Maybe (String,String,String)
+-- > splitInThreeF (Cons ',' ((_, Just (' ':ys,zs)), _)) = Just ([], ys, zs)
+-- > splitInThreeF (Cons x (_, Just (xs,ys,zs)))         = Just (x:xs, ys, zs)
+-- > splitInThreeF _                                     = Nothing
+-- >
+-- > dist :: Corecursive t
+-- >      => (Base t (t,b) -> b)
+-- >      -> Base t ((t,b), a)
+-- >      -> ((t,b), Base t a)
+-- > dist f baseTBA = let baseTB = fst <$> baseTBA
+-- >                      baseT  = fst <$> baseTB
+-- >                      baseA  = snd <$> baseTBA
+-- >                      b      = f baseTB
+-- >                      t      = embed baseT
+-- >                  in ((t,b), baseA)
 gfold, gcata
   :: (Recursive t, Comonad w)
   => (forall b. Base t (w b) -> w (Base t b)) -- ^ a distributive law
@@ -419,7 +706,34 @@ gfold k g t = gcata k g t
 distCata :: Functor f => f (Identity a) -> Identity (f a)
 distCata = Identity . fmap runIdentity
 
--- | A generalized anamorphism
+-- | A generalized anamorphism. With the appropriate distributive law, it can be
+-- specialized to any unfold: an 'ana', an 'apo', a 'futu', etc.
+--
+-- For example, we could build a version of 'gapo' with three phases instead of
+-- two:
+--
+-- > -- |
+-- > -- >>> upDownUp 4
+-- > -- [1,2,3,4,3,2,1,2,3,4]
+-- > upDownUp :: Int -> [Int]
+-- > upDownUp n = gana (dist upAgain down) up 1 where
+-- >   up :: Int -> ListF Int (Int `Either` Int `Either` Int)
+-- >   up i = Cons i (if i == n then Left (Right (n-1)) else Right (i+1))
+-- >
+-- >   down :: Int -> ListF Int (Either Int Int)
+-- >   down i = Cons i (if i == 1 then Left 2 else Right (i-1))
+-- >
+-- >   upAgain :: Int -> ListF Int Int
+-- >   upAgain i = if i > n then Nil else Cons i (i+1)
+-- >
+-- > dist :: Functor f
+-- >      => (c -> f c)
+-- >      -> (b -> f (Either c b))
+-- >      -> c `Either` b `Either` f a
+-- >      -> f (c `Either` b `Either` a)
+-- > dist f _ (Left (Left z))  = Left <$> Left <$> f z
+-- > dist _ g (Left (Right y)) = Left <$> g y
+-- > dist _ _ (Right fx)       = Right <$> fx
 gunfold, gana
   :: (Corecursive t, Monad m)
   => (forall b. m (Base t b) -> Base t (m b)) -- ^ a distributive law
@@ -433,7 +747,30 @@ gunfold k f t = gana k f t
 distAna :: Functor f => Identity (f a) -> f (Identity a)
 distAna = fmap Identity . runIdentity
 
--- | A generalized hylomorphism
+-- | A generalized hylomorphism. Like a 'hylo', this is an optimized version of
+-- an unfold followed by a fold. The fold and unfold operations correspond to
+-- the given distributive laws.
+--
+-- For example, one way to implement @fib n@ is to compute @fib 1@ up to
+-- @fib n@. This is a simple linear recursive structure which we can model by
+-- unfolding our seed /n/ into a @Fix Maybe@ containing /n/ 'Just's. To do that,
+-- a 'cata' is sufficient. We then fold the sub-tree containing /i/ 'Just's by
+-- computing @fib i@ out of @fib (i-1)@ and @fib (i-2)@, the results of folding
+-- two smaller sub-trees. To see more than one such result, we need a 'histo'.
+--
+-- > -- |
+-- > -- >>> fmap fib [0..8]
+-- > -- [1,1,2,3,5,8,13,21,34]
+-- > fib :: Int -> Integer
+-- > fib = ghylo distHisto distAna addF down where
+-- >   down :: Int -> Maybe (Identity Int)
+-- >   down 0 = Nothing
+-- >   down n = Just (Identity (n-1))
+-- >
+-- >   addF :: Maybe (Cofree Maybe Integer) -> Integer
+-- >   addF Nothing                     = 1
+-- >   addF (Just (_ :< Nothing))       = 1
+-- >   addF (Just (x :< Just (y :< _))) = x + y
 grefold, ghylo
   :: (Comonad w, Functor f, Monad m)
   => (forall c. f (w c) -> w (f c))
@@ -446,6 +783,20 @@ ghylo w m f g = extract . h . return where
   h = fmap f . w . fmap (duplicate . h . join) . m . liftM g
 grefold w m f g a = ghylo w m f g a
 
+-- | A variant of 'ana' in which more than one recursive layer can be generated
+-- before returning the next seed.
+--
+-- Useful for inserting a group of elements all at once:
+--
+-- > -- |
+-- > -- >>> spaceOutCommas "foo,bar,baz"
+-- > -- "foo, bar, baz"
+-- > spaceOutCommas :: String -> String
+-- > spaceOutCommas = futu go where
+-- >   go :: String -> ListF Char (Free (ListF Char) String)
+-- >   go []       = Nil
+-- >   go (',':xs) = Cons ',' (Free (Cons ' ' (Pure xs)))
+-- >   go (x:xs)   = Cons x (Pure xs)
 futu :: Corecursive t => (a -> Base t (Free (Base t) a)) -> a -> t
 futu = gana distFutu
 
@@ -466,6 +817,15 @@ distGFutu k = d where
 -- Fix
 -------------------------------------------------------------------------------
 
+-- | Construct a recursive datatype from a base functor.
+--
+-- For example, @[String]@ and @Fix (ListF String)@ are isomorphic:
+--
+-- > ["foo", "bar"]
+-- > Fix (Cons "foo" (Fix (Cons "bar" (Fix Nil))))
+--
+-- Unlike 'Mu' and 'Nu', this representation is concrete, so we can
+-- pattern-match on the constructors of @f@.
 newtype Fix f = Fix (f (Fix f))
 
 unfix :: Fix f -> f (Fix f)
@@ -528,6 +888,9 @@ instance Functor f => Recursive (Fix f) where
 instance Functor f => Corecursive (Fix f) where
   embed = Fix
 
+-- |
+-- >>> refix ["foo", "bar"] :: Fix (ListF String)
+-- Fix (Cons "foo" (Fix (Cons "bar" (Fix Nil))))
 refix :: (Recursive s, Corecursive t, Base s ~ Base t) => s -> t
 refix = cata embed
 
@@ -549,6 +912,16 @@ lambek = cata (fmap embed)
 colambek :: (Recursive t, Corecursive t) => (Base t t -> t)
 colambek = ana (fmap project)
 
+-- |
+-- The least fixed point of 'f', in the sense that if we did not have general
+-- recursion, we would be forced to use the @f a -> a@ argument a finite number
+-- of times and so we could only construct finite values. Since we do have
+-- general recursion, 'Fix', 'Mu' and 'Nu' are all equivalent.
+--
+-- For example, @Fix (ListF String)@ and @Mu (ListF String)@ are isomorphic:
+--
+-- > Fix         (Cons "foo" (Fix (Cons "bar" (Fix Nil))))
+-- > Mu (\f -> f (Cons "foo" (f   (Cons "bar" (f   Nil)))))
 newtype Mu f = Mu (forall a. (f a -> a) -> a)
 type instance Base (Mu f) = f
 instance Functor f => Recursive (Mu f) where
@@ -586,6 +959,16 @@ instance Functor f => Corecursive (CMFC.F f a) where
   embed (CMTF.Pure a)  = CMFC.F $ \p _ -> p a
   embed (CMTF.Free fr) = CMFC.F $ \p f -> f $ fmap (cmfcCata p f) fr
 
+-- |
+-- The greatest fixed point of 'f', in the sense that even if we did not have
+-- general recursion, we could still describe an infinite list by defining an
+-- @a -> ListF Int a@ function which always returns a 'Cons'. Since we do have
+-- general recursion, 'Fix', 'Mu' and 'Nu' are all equivalent.
+--
+-- For example, @Fix (ListF String)@ and @Nu (ListF String)@ are isomorphic:
+--
+-- > Fix            (Cons "foo" (Fix   (Cons "bar" (Fix    Nil))))
+-- > Nu (\case {0 -> Cons "foo" 1; 1 -> Cons "bar" 2; _ -> Nil}) 0
 data Nu f where Nu :: (a -> f a) -> a -> Nu f
 type instance Base (Nu f) = f
 instance Functor f => Corecursive (Nu f) where
@@ -611,6 +994,26 @@ instance (Functor f, Read1 f) => Read (Nu f) where
     fromFix <$> step readPrec
 #endif
 
+-- | A variant of 'para' in which instead of also giving the original sub-tree,
+-- the recursive positions give the result of applying a 'cata' to that
+-- sub-tree. Thanks to the shared structure, 'zygo' is more efficient than
+-- manually applying 'cata' inside a 'para'.
+--
+-- > -- | A variant of 'nub' which keeps the last occurrence instead of the first.
+-- > --
+-- > -- >>> nub [1,2,2,3,2,1,1,4]
+-- > -- [1,2,3,4]
+-- > -- >>> nubEnd [1,2,2,3,2,1,1,4]
+-- > -- [3,2,1,4]
+-- > nubEnd :: [Int] -> [Int]
+-- > nubEnd = zygo gather go where
+-- >   gather :: ListF Int (Set Int) -> Set Int
+-- >   gather Nil         = Set.empty
+-- >   gather (Cons x xs) = Set.insert x xs
+-- >
+-- >   go :: ListF Int (Set Int, [Int]) -> [Int]
+-- >   go Nil                = []
+-- >   go (Cons x (seen,xs)) = if Set.member x seen then xs else x:xs
 zygo :: Recursive t => (Base t b -> b) -> (Base t (b, a) -> a) -> t -> a
 zygo f = gfold (distZygo f)
 
@@ -620,6 +1023,35 @@ distZygo
   -> (f (b, a) -> (b, f a)) -- ^ A distributive for semi-mutual recursion
 distZygo g m = (g (fmap fst m), fmap snd m)
 
+-- | A generalized zygomorphism. Like 'zygo', each recursive position gives the
+-- result of the fold on its sub-tree and also the result of a 'cata' on that
+-- sub-tree. Depending on the distributive law, more information about that
+-- sub-tree may also be provided.
+--
+-- For example, we could build a "zygomorphic zygomorphism", in which the result
+-- of a second 'cata' is also provided:
+--
+-- > -- | Is any path from a node to a leaf more than twice as long as the path from
+-- > -- that node to another leaf?
+-- > --
+-- > -- >>> take 10 $ map isUnbalanced $ iterate (\t -> leaf () `branch` t) $ leaf ()
+-- > -- [False,False,False,False,True,True,True,True,True,True]
+-- > isUnbalanced :: Tree a -> Bool
+-- > isUnbalanced = gzygo minDepthF (distZygo maxDepthF) isUnbalancedF
+-- >
+-- > minDepthF :: TreeF a Int -> Int
+-- > minDepthF (Leaf _)     = 1
+-- > minDepthF (Branch x y) = 1 + min x y
+-- >
+-- > maxDepthF :: TreeF a Int -> Int
+-- > maxDepthF (Leaf _)     = 1
+-- > maxDepthF (Branch x y) = 1 + max x y
+-- >
+-- > isUnbalancedF :: TreeF a (EnvT Int ((,) Int) Bool) -> Bool
+-- > isUnbalancedF (Leaf _) = False
+-- > isUnbalancedF (Branch (EnvT min1 (max1, unbalanced1))
+-- >                       (EnvT min2 (max2, unbalanced2)))
+-- >   = unbalanced1 || unbalanced2 || 2 * (1 + min min1 min2) < (1 + max max1 max2)
 gzygo
   :: (Recursive t, Comonad w)
   => (Base t b -> b)
@@ -637,6 +1069,20 @@ distZygoT
 distZygoT g k fe = EnvT (g (getEnv <$> fe)) (k (lower <$> fe))
   where getEnv (EnvT e _) = e
 
+-- | A variant of 'apo' in which the short-circuiting sub-tree is described
+-- using an 'ana'.
+--
+-- > -- |
+-- > -- >>> upThenDown 4
+-- > -- [1,2,3,4,3,2,1]
+-- > upThenDown :: Int -> [Int]
+-- > upThenDown n = gapo down up 1 where
+-- >   up :: Int -> ListF Int (Either Int Int)
+-- >   up i = Cons i (if i == n then Left (n-1) else Right (i+1))
+-- >
+-- >   down :: Int -> ListF Int Int
+-- >   down 0 = Nil
+-- >   down i = Cons i (i-1)
 gapo :: Corecursive t => (b -> Base t b) -> (a -> Base t (Either b a)) -> a -> t
 gapo g = gunfold (distGApo g)
 
@@ -654,7 +1100,27 @@ distGApoT
   -> f (ExceptT b m a)
 distGApoT g k = fmap ExceptT . k . fmap (distGApo g) . runExceptT
 
--- | Course-of-value iteration
+-- | Course-of-value iteration. Similar to 'para' in that each recursive position
+-- also includes a representation of its original sub-tree in addition to the
+-- result of folding that sub-tree, except that representation also includes the
+-- results of folding the sub-trees of that sub-tree, as well as the results of
+-- their sub-trees, etc.
+--
+-- Useful for folding more than one layer at a time:
+--
+-- > -- |
+-- > -- >>> pairs [1,2,3,4]
+-- > -- Just [(1,2),(3,4)]
+-- > -- >>> pairs [1,2,3,4,5]
+-- > -- Nothing
+-- > pairs :: [Int] -> Maybe [(Int,Int)]
+-- > pairs = histo pairsF
+-- >
+-- > pairsF :: ListF Int (Cofree (ListF Int) (Maybe [(Int,Int)]))
+-- >        -> Maybe [(Int,Int)]
+-- > pairsF Nil                                    = Just []
+-- > pairsF (Cons x (_ :< Cons y (Just xys :< _))) = Just ((x,y):xys)
+-- > pairsF _                                      = Nothing
 histo :: Recursive t => (Base t (Cofree (Base t) a) -> a) -> t -> a
 histo = gcata distHisto
 
@@ -667,9 +1133,59 @@ distHisto fc = fmap extract fc :< fmap (distHisto . Cofree.unwrap) fc
 distGHisto :: (Functor f, Functor h) => (forall b. f (h b) -> h (f b)) -> f (CofreeT f h a) -> CofreeT f h (f a)
 distGHisto k = d where d = CofreeT . fmap (\fc -> fmap CCTC.headF fc CCTC.:< fmap (d . CCTC.tailF) fc) . k . fmap runCofreeT
 
+-- | An optimized version of a 'futu' followed by a 'histo'.
+--
+-- > -- |
+-- > -- >>> putStr $ decompressImage [(1,'.'),(1,'*'),(3,'.'),(4,'*')]
+-- > -- .*.
+-- > -- ..*
+-- > -- ***
+-- > decompressImage :: [(Int,Char)] -> String
+-- > decompressImage = chrono linesOf3 decodeRLE where
+-- >   decodeRLE :: [(Int,Char)] -> ListF Char (Free (ListF Char) [(Int,Char)])
+-- >   decodeRLE []          = Nil
+-- >   decodeRLE ((n,c):ncs) = Cons c $ do
+-- >     replicateM_ (n-1) $ Free $ Cons c $ Pure ()
+-- >     pure ncs
+-- >
+-- >   linesOf3 :: ListF Char (Cofree (ListF Char) String) -> String
+-- >   linesOf3 (Cons c1 (_ :< Cons c2 (_ :< Cons c3 (cs :< _)))) = c1:c2:c3:'\n':cs
+-- >   linesOf3 _                                                 = ""
 chrono :: Functor f => (f (Cofree f b) -> b) -> (a -> f (Free f a)) -> (a -> b)
 chrono = ghylo distHisto distFutu
 
+-- | An optimized version of a 'gfutu' followed by a 'ghisto'.
+--
+-- > -- |
+-- > -- >>> putStr $ decompressImage [1,1,3,4]
+-- > -- .*.
+-- > -- ..*
+-- > -- ***
+-- > decompressImage :: [Int] -> String
+-- > decompressImage = gchrono (distZygo toggle) distAna linesOf3 decodeRLE where
+-- >   decodeRLE :: [Int] -> ListF Bool (Free (ListF Bool) [Int])
+-- >   decodeRLE [] = Nil
+-- >   decodeRLE (1:ns) = Cons True $ pure ns
+-- >   decodeRLE (n:ns) = Cons False $ do
+-- >     replicateM_ (n-2) $ writeBool False
+-- >     writeBool True
+-- >     pure ns
+-- >
+-- >   toggle :: ListF Bool Char -> Char
+-- >   toggle Nil              = '.'
+-- >   toggle (Cons False c)   = c
+-- >   toggle (Cons True '.')  = '*'
+-- >   toggle (Cons True _)    = '.'
+-- >
+-- >   linesOf3 :: ListF Bool (CofreeT (ListF Bool) ((,) Char) String) -> String
+-- >   linesOf3 (Cons b1 (CofreeT (c2, _ :< Cons _
+-- >                     (CofreeT (c3, _ :< Cons _
+-- >                     (CofreeT (_,  s :< _)))))))
+-- >     = toggle (Cons b1 c2) : c2 : c3 : '\n' : s
+-- >   linesOf3 _ = ""
+-- >
+-- >   writeBool :: Bool -> Free (ListF Bool) ()
+-- >   writeBool b = FreeT $ Identity $ Free $ Cons b $ pure ()
 gchrono :: (Functor f, Comonad w, Monad m) =>
            (forall c. f (w c) -> w (f c)) ->
            (forall c. m (f c) -> f (m c)) ->
@@ -677,25 +1193,176 @@ gchrono :: (Functor f, Comonad w, Monad m) =>
            (a -> b)
 gchrono w m = ghylo (distGHisto w) (distGFutu m)
 
--- | Mendler-style iteration
+-- | Mendler-style iteration, a restriction of general recursion in which the
+-- recursive calls can only be applied to the recursive position. Equivalent to
+-- a 'cata'.
+--
+-- Contrast the following with the example for 'cata': instead of already
+-- having the sum for the tail of the list, we have an opaque version of the
+-- rest of the list, and a function which can compute its sum.
+--
+-- > -- |
+-- > -- >>> sum $ refix [1,2,3]
+-- > -- 6
+-- > sum :: Fix (ListF Int) -> Int
+-- > sum = mcata $ \recur -> \case
+-- >   Nil       -> 0
+-- >   Cons x xs -> x + recur xs
 mcata :: (forall y. (y -> c) -> f y -> c) -> Fix f -> c
 mcata psi = psi (mcata psi) . unfix
 
--- | Mendler-style course-of-value iteration
+-- | Mendler-style course-of-value iteration, a restriction of general
+-- recursion in which the recursive calls can only be applied to smaller terms.
+-- Equivalent to 'histo' in terms of expressiveness, but note that overlapping
+-- sub-problems aren't automatically cached by the 'Cofree'.
+--
+-- Contrast the following with the example for 'histo': instead of already
+-- having the solution for the tail of the tail of the list, we unroll the list
+-- in order to obtain an opaque version of the tail of the tail of the list,
+-- and then we recur on it.
+--
+-- > -- |
+-- > -- >>> pairs $ refix [1,2,3,4]
+-- > -- Just [(1,2),(3,4)]
+-- > -- >>> pairs $ refix [1,2,3,4,5]
+-- > -- Nothing
+-- > pairs :: Fix (ListF Int) -> Maybe [(Int,Int)]
+-- > pairs = mhisto $ \recur unroll -> \case
+-- >   Nil       -> Just []
+-- >   Cons x xs -> case unroll xs of
+-- >     Nil       -> Nothing
+-- >     Cons y ys -> ((x,y) :) <$> recur ys
 mhisto :: (forall y. (y -> c) -> (y -> f y) -> f y -> c) -> Fix f -> c
 mhisto psi = psi (mhisto psi) unfix . unfix
 
--- | Elgot algebras
+-- | Elgot algebras, a variant of 'hylo' in which the anamorphism side may
+-- decide to stop unfolding and to produce a solution instead. Useful when the
+-- base functor does not have a constructor for the base case.
+--
+-- For example, in the following implementation of @fib n@, we naively recur on
+-- @n-1@ and @n-2@ until we hit the base case, at which point we stop
+-- unfolding. With 'hylo', we would use 'Branch' to recur and 'Leaf' to stop
+-- unfolding, whereas with 'elgot' we can use 'Pair', a variant of 'TreeF'
+-- which does not have a 'Leaf'-like constructor for the base case.
+--
+-- > data Pair a = Pair a a
+-- >   deriving Functor
+-- >
+-- > -- |
+-- > -- >>> fmap fib [0..8]
+-- > -- [1,1,2,3,5,8,13,21,34]
+-- > fib :: Int -> Integer
+-- > fib = elgot merge split where
+-- >   split :: Int -> Either Integer (Pair Int)
+-- >   split 0 = Left 1
+-- >   split 1 = Left 1
+-- >   split n = Right $ Pair (n-1) (n-2)
+-- >
+-- >   merge :: Pair Integer -> Integer
+-- >   merge (Pair x y) = x + y
 elgot :: Functor f => (f a -> a) -> (b -> Either a (f b)) -> b -> a
 elgot phi psi = h where h = (id ||| phi . fmap h) . psi
 
--- | Elgot coalgebras: <http://comonad.com/reader/2008/elgot-coalgebras/>
+-- | Elgot coalgebras, a variant of 'hylo' in which the catamorphism side also
+-- has access to the seed which produced the sub-tree at that recursive
+-- position. See <http://comonad.com/reader/2008/elgot-coalgebras/>
+--
+-- Contrast the following with the example for 'elgot': the base case is
+-- detected while folding instead of while unfolding.
+--
+-- > -- |
+-- > -- >>> fmap fib [0..8]
+-- > -- [1,1,2,3,5,8,13,21,34]
+-- > fib :: Int -> Integer
+-- > fib = coelgot merge split where
+-- >   split :: Int -> Pair Int
+-- >   split n = Pair (n-1) (n-2)
+-- >
+-- >   merge :: (Int, Pair Integer) -> Integer
+-- >   merge (0, _) = 1
+-- >   merge (1, _) = 1
+-- >   merge (_, Pair x y) = x + y
 coelgot :: Functor f => ((a, f b) -> b) -> (a -> f a) -> a -> b
 coelgot phi psi = h where h = phi . (id &&& fmap h . psi)
 
--- | Zygohistomorphic prepromorphisms:
+-- | The infamous "zygohistomorphic prepromorphism". There is nothing special
+-- about this particular construction, it just happens to have a name which
+-- sounds like gobbledygook, making it a prime target for jokes such as
+-- <http://www.haskell.org/haskellwiki/Zygohistomorphic_prepromorphisms>.
 --
--- A corrected and modernized version of <http://www.haskell.org/haskellwiki/Zygohistomorphic_prepromorphisms>
+-- Once you become familiar with the vocabulary of this library, the name no
+-- longer sounds alien and is instead a very concise description of what it
+-- does:
+--
+-- * It is a prepromorphism, meaning that it takes a recursive data structure
+--   of type @t@, such as a list or a tree, and applies the
+--   @forall c. Base t c -> Base t c@ transformation /n/ times at depth /n/.
+--   The transformed results are then combined into a final solution of type
+--   @a@ by applying the @Base t (EnvT b (Cofree (Base t)) a) -> a@ function
+--   repeatedly, folding the recursive structure down to a single value. This
+--   function is called an "algebra", and the other bullet points explain the
+--   various part of its complicated type. See 'prepro'.
+-- * It is zygomorphic, meaning that an auxiliary @Base t b -> b@ function
+--   combines the transformed values into an auxiliary solution of type @b@.
+--   The @EnvT b@ gives the algebra access to those auxiliary results. See
+--   'zygo'.
+-- * It is histomorphic, meaning that a @Cofree (Base t)@ gives the algebra
+--   access to the solutions it previously computed for all the descendents of
+--   the tree-like data structure being folded, not just those for the
+--   immediate children. See 'histo'.
+--
+-- Here is an example function which uses all of those features:
+--
+-- * It uses indentation to illustrate nesting, that is, it applies an
+--   indentation function /n/ times at depth /n/.
+-- * It uses an auxiliary @TreeF String String -> String@ function to compute
+--   the header of a group, which we choose to be the prefix shared by all
+--   sub-trees.
+-- * It alternates between two bullet styles, by looking at the solutions
+--   computed two levels below.
+--
+-- > -- |
+-- > -- >>> let tree = ((leaf "0.1.1.1" `branch` leaf "0.1.1.2") `branch` leaf "0.1.2") `branch` (leaf "0.2.1" `branch` leaf "0.2.2")
+-- > -- >>> putStrLn (alternateBullets tree)
+-- > -- * 0.
+-- > --   - 0.1.
+-- > --   * 0.1.1.
+-- > --       - 0.1.1.1
+-- > --       - 0.1.1.2
+-- > --     * 0.1.2
+-- > --   - 0.2.
+-- > --     * 0.2.1
+-- > --     * 0.2.2
+-- > --
+-- > alternateBullets :: Tree String -> String
+-- > alternateBullets = zygoHistoPrepro mergeHeaders indent starThenDash
+-- >
+-- > starThenDash :: TreeF String (EnvT String (Cofree (TreeF String)) String) -> String
+-- > starThenDash (Leaf s) = addBullet '*' s
+-- > starThenDash (Branch (EnvT headerL cofreeL)
+-- >                      (EnvT headerR cofreeR))
+-- >   = addBullet '*' (mergeHeaders (Branch headerL headerR)) ++ "\n"
+-- >  ++ dashThenStar headerL cofreeL ++ "\n"
+-- >  ++ dashThenStar headerR cofreeR
+-- >
+-- > dashThenStar :: String -> Cofree (TreeF String) String -> String
+-- > dashThenStar _ (_ :< Leaf s) = addBullet '-' s
+-- > dashThenStar header (_ :< Branch (sL :< _) (sR :< _))
+-- >   = addBullet '-' header ++ "\n"
+-- >  ++ sL ++ "\n"
+-- >  ++ sR
+-- >
+-- > -- |
+-- > -- >>> addBullet '*' "   foo"
+-- > -- "   * foo"
+-- > addBullet :: Char -> String -> String
+-- > addBullet bullet line = takeWhile (== ' ') line
+-- >                      ++ (bullet:" ")
+-- >                      ++ dropWhile (== ' ') line
+--
+-- Notice that the indentation of @"* 0.1.1."@ is off by one! This is because
+-- the comonad-based implementation of 'zygoHistoPrepro' is
+-- <https://github.com/ekmett/recursion-schemes/issues/50 subtly incorrect>.
 zygoHistoPrepro
   :: (Corecursive t, Recursive t)
   => (Base t b -> b)
