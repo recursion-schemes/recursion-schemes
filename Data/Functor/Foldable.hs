@@ -59,6 +59,7 @@ module Data.Functor.Foldable
   , histo
   , ghisto
   , futu
+  , gfutu
   , chrono
   , gchrono
   -- ** Distributive laws
@@ -448,12 +449,18 @@ grefold w m f g a = ghylo w m f g a
 futu :: Corecursive t => (a -> Base t (Free (Base t) a)) -> a -> t
 futu = gana distFutu
 
-distFutu :: Functor f => Free f (f a) -> f (Free f a)
-distFutu = distGFutu id
+gfutu :: forall t m a. (Corecursive t, Monad m) => (forall b. m (Base t b) -> Base t (m b)) -> (a -> Base t (FreeT (Base t) m a)) -> a -> t
+gfutu g = gana (distGFutu g)
 
-distGFutu :: (Functor f, Functor h) => (forall b. h (f b) -> f (h b)) -> Free h (f a) -> f (Free h a)
-distGFutu _ (Pure fa) = Pure <$> fa
-distGFutu k (Free as) = Free <$> k (distGFutu k <$> as)
+distFutu :: Functor f => Free f (f a) -> f (Free f a)
+distFutu (Pure fx) = Pure <$> fx
+distFutu (Free ff) = Free . distFutu <$> ff
+
+distGFutu :: (Functor f, Functor h) => (forall b. h (f b) -> f (h b)) -> FreeT f h (f a) -> f (FreeT f h a)
+distGFutu k = d where
+  d = fmap FreeT . k . fmap d' . runFreeT
+  d' (CMTF.Pure ff) = CMTF.Pure <$> ff
+  d' (CMTF.Free ff) = CMTF.Free . d <$> ff
 
 -------------------------------------------------------------------------------
 -- Fix
@@ -651,22 +658,22 @@ distGApoT g k = fmap ExceptT . k . fmap (distGApo g) . runExceptT
 histo :: Recursive t => (Base t (Cofree (Base t) a) -> a) -> t -> a
 histo = gcata distHisto
 
-ghisto :: (Recursive t, Functor h) => (forall b. Base t (h b) -> h (Base t b)) -> (Base t (Cofree h a) -> a) -> t -> a
+ghisto :: (Recursive t, Comonad w) => (forall b. Base t (w b) -> w (Base t b)) -> (Base t (CofreeT (Base t) w a) -> a) -> t -> a
 ghisto g = gcata (distGHisto g)
 
 distHisto :: Functor f => f (Cofree f a) -> Cofree f (f a)
-distHisto = distGHisto id
+distHisto fc = fmap extract fc :< fmap (distHisto . Cofree.unwrap) fc
 
-distGHisto :: (Functor f, Functor h) => (forall b. f (h b) -> h (f b)) -> f (Cofree h a) -> Cofree h (f a)
-distGHisto k = Cofree.unfold (\as -> (extract <$> as, k (Cofree.unwrap <$> as)))
+distGHisto :: (Functor f, Functor h) => (forall b. f (h b) -> h (f b)) -> f (CofreeT f h a) -> CofreeT f h (f a)
+distGHisto k = d where d = CofreeT . fmap (\fc -> fmap CCTC.headF fc CCTC.:< fmap (d . CCTC.tailF) fc) . k . fmap runCofreeT
 
 chrono :: Functor f => (f (Cofree f b) -> b) -> (a -> f (Free f a)) -> (a -> b)
 chrono = ghylo distHisto distFutu
 
-gchrono :: (Functor f, Functor w, Functor m) =>
+gchrono :: (Functor f, Comonad w, Monad m) =>
            (forall c. f (w c) -> w (f c)) ->
            (forall c. m (f c) -> f (m c)) ->
-           (f (Cofree w b) -> b) -> (a -> f (Free m a)) ->
+           (f (CofreeT f w b) -> b) -> (a -> f (FreeT f m a)) ->
            (a -> b)
 gchrono w m = ghylo (distGHisto w) (distGFutu m)
 
