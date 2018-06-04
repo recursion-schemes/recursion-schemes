@@ -449,7 +449,7 @@ grefold w m f g a = ghylo w m f g a
 futu :: Corecursive t => (a -> Base t (Free (Base t) a)) -> a -> t
 futu = gana distFutu
 
-gfutu :: forall t m a. (Corecursive t, Monad m) => (forall b. m (Base t b) -> Base t (m b)) -> (a -> Base t (FreeT (Base t) m a)) -> a -> t
+gfutu :: (Corecursive t, Monad m) => (forall b. m (Base t b) -> Base t (m b)) -> (a -> Base t (FreeT (Base t) m a)) -> a -> t
 gfutu g = gana (distGFutu g)
 
 distFutu :: Functor f => Free f (f a) -> f (Free f a)
