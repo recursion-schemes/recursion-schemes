@@ -449,7 +449,7 @@ grefold w m f g a = ghylo w m f g a
 futu :: Corecursive t => (a -> Base t (Free (Base t) a)) -> a -> t
 futu = gana distFutu
 
-gfutu :: (Corecursive t, Monad m) => (forall b. m (Base t b) -> Base t (m b)) -> (a -> Base t (FreeT (Base t) m a)) -> a -> t
+gfutu :: (Corecursive t, Functor m, Monad m) => (forall b. m (Base t b) -> Base t (m b)) -> (a -> Base t (FreeT (Base t) m a)) -> a -> t
 gfutu g = gana (distGFutu g)
 
 distFutu :: Functor f => Free f (f a) -> f (Free f a)
@@ -670,7 +670,7 @@ distGHisto k = d where d = CofreeT . fmap (\fc -> fmap CCTC.headF fc CCTC.:< fma
 chrono :: Functor f => (f (Cofree f b) -> b) -> (a -> f (Free f a)) -> (a -> b)
 chrono = ghylo distHisto distFutu
 
-gchrono :: (Functor f, Comonad w, Monad m) =>
+gchrono :: (Functor f, Functor w, Functor m, Comonad w, Monad m) =>
            (forall c. f (w c) -> w (f c)) ->
            (forall c. m (f c) -> f (m c)) ->
            (f (CofreeT f w b) -> b) -> (a -> f (FreeT f m a)) ->
