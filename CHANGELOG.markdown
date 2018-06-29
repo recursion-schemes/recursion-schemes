@@ -1,3 +1,7 @@
+## next [????.??.??]
+* Make the Template Haskell machinery look through type synonyms.
+* Avoid incurring some dependencies when using recent GHCs.
+
 ## 5.0.2
 * Support GHC-8.2.1
 * Fix Template Haskell derivation with non-default type renamer.
