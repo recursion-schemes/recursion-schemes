@@ -1,4 +1,4 @@
-## next [????.??.??]
+## 5.0.3 [2018.07.01]
 * Make the Template Haskell machinery look through type synonyms.
 * Avoid incurring some dependencies when using recent GHCs.
 
