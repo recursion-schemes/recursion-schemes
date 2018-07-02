@@ -77,7 +77,7 @@ library
   if flag(template-haskell)
     build-depends:
       template-haskell >= 2.5.0.0 && < 2.14,
-      base-orphans     >= 0.5.4   && < 0.8,
+      base-orphans     >= 0.5.4   && < 0.9,
       th-abstraction   >= 0.2.4   && < 1
     exposed-modules:
       Data.Functor.Foldable.TH
