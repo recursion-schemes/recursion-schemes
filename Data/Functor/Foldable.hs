@@ -46,9 +46,9 @@ module Data.Functor.Foldable
     Base
   , ListF(..)
   -- * Fixed points
-  , Fix(..), unfix
-  , Mu(..)
-  , Nu(..)
+  , Fix(..), unfix, hoistFix
+  , Mu(..), hoistMu
+  , Nu(..), hoistNu
   -- * Folding
   , Recursive(..)
   -- ** Combinators
@@ -537,6 +537,11 @@ toFix = refix
 fromFix :: Corecursive t => Fix (Base t) -> t
 fromFix = refix
 
+hoistFix :: Functor f
+         => (forall a. f a -> g a) -> Fix f -> Fix g
+hoistFix n = cata (Fix . n)
+
+
 -------------------------------------------------------------------------------
 -- Lambek
 -------------------------------------------------------------------------------
@@ -574,6 +579,11 @@ instance (Functor f, Read1 f) => Read (Mu f) where
     fromFix <$> step readPrec
 #endif
 
+hoistMu :: Functor f
+        => (forall a. f a -> g a) -> Mu f -> Mu g
+hoistMu n (Mu mk) = Mu $ \roll -> mk (roll . n)
+
+
 -- | Church encoded free monads are Recursive/Corecursive, in the same way that
 -- 'Mu' is.
 type instance Base (CMFC.F f a) = FreeF f a
@@ -585,6 +595,7 @@ instance Functor f => Recursive (CMFC.F f a) where
 instance Functor f => Corecursive (CMFC.F f a) where
   embed (CMTF.Pure a)  = CMFC.F $ \p _ -> p a
   embed (CMTF.Free fr) = CMFC.F $ \p f -> f $ fmap (cmfcCata p f) fr
+
 
 data Nu f where Nu :: (a -> f a) -> a -> Nu f
 type instance Base (Nu f) = f
@@ -610,6 +621,11 @@ instance (Functor f, Read1 f) => Read (Nu f) where
     Ident "fromFix" <- lexP
     fromFix <$> step readPrec
 #endif
+
+hoistNu :: Functor g
+        => (forall a. f a -> g a) -> Nu f -> Nu g
+hoistNu n (Nu next seed) = Nu (n . next) seed
+
 
 zygo :: Recursive t => (Base t b -> b) -> (Base t (b, a) -> a) -> t -> a
 zygo f = gfold (distZygo f)
