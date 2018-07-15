@@ -1,9 +1,11 @@
-## 5.0.3 [2018.07.01]
-* Make the Template Haskell machinery look through type synonyms.
-* Avoid incurring some dependencies when using recent GHCs.
+## (next version)
 * Export gfutu
 * `distGHisto`, `ghisto`, and `gchrono` now use `Cofree (Base t)`
 * `distGFutu`, `gfutu`, and `gchrono` now use `Free (Base t)`
+
+## 5.0.3 [2018.07.01]
+* Make the Template Haskell machinery look through type synonyms.
+* Avoid incurring some dependencies when using recent GHCs.
 
 ## 5.0.2
 * Support GHC-8.2.1
