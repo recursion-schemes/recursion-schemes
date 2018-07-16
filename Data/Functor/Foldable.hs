@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, TypeFamilies, Rank2Types, FlexibleContexts, FlexibleInstances, GADTs, StandaloneDeriving, UndecidableInstances #-}
+{-# LANGUAGE CPP, TypeFamilies, Rank2Types, FlexibleContexts, FlexibleInstances, GADTs, ScopedTypeVariables, StandaloneDeriving, UndecidableInstances #-}
 
 -- explicit dictionary higher-kind instances are defined in
 -- - base-4.9
@@ -62,25 +62,27 @@ module Data.Functor.Foldable
   , gfutu
   , chrono
   , gchrono
-  -- ** Distributive laws
-  , distCata
-  , distPara
-  , distParaT
-  , distZygo
-  , distZygoT
-  , distHisto
-  , distGHisto
-  , distFutu
-  , distGFutu
+  -- ** Gathering functions
+  , Gather
+  , gatherCata
+  , gatherPara
+  , gatherParaT
+  , gatherZygo
+  , gatherZygoT
+  , gatherHisto
+  , gatherGHisto
   -- * Unfolding
   , Corecursive(..)
   -- ** Combinators
   , gana
-  -- ** Distributive laws
-  , distAna
-  , distApo
-  , distGApo
-  , distGApoT
+  -- ** Scattering functions
+  , Scatter
+  , scatterAna
+  , scatterApo
+  , scatterGApo
+  , scatterGApoT
+  , scatterFutu
+  , scatterGFutu
   -- * Refolding
   , hylo
   , ghylo
@@ -102,19 +104,13 @@ module Data.Functor.Foldable
 
 import Control.Applicative
 import Control.Comonad
-import Control.Comonad.Trans.Class
-import Control.Comonad.Trans.Env
-import qualified Control.Comonad.Cofree as Cofree
 import Control.Comonad.Cofree (Cofree(..))
 import           Control.Comonad.Trans.Cofree (CofreeF, CofreeT(..))
 import qualified Control.Comonad.Trans.Cofree as CCTC
-import Control.Monad (liftM, join)
 import Control.Monad.Free (Free(..))
 import qualified Control.Monad.Free.Church as CMFC
-import Control.Monad.Trans.Except (ExceptT(..), runExceptT)
 import           Control.Monad.Trans.Free (FreeF, FreeT(..))
 import qualified Control.Monad.Trans.Free as CMTF
-import Data.Functor.Identity
 import Control.Arrow
 import Data.Function (on)
 import Data.Functor.Classes
@@ -160,10 +156,10 @@ class Functor (Base t) => Recursive t where
   cata f = c where c = f . fmap c . project
 
   para :: (Base t (t, a) -> a) -> t -> a
-  para t = p where p x = t . fmap ((,) <*> p) $ project x
+  para f = p where p x = f . fmap ((,) <*> p) $ project x
 
-  gpara :: (Corecursive t, Comonad w) => (forall b. Base t (w b) -> w (Base t b)) -> (Base t (EnvT t w a) -> a) -> t -> a
-  gpara t = gzygo embed t
+  gpara :: Corecursive t => Gather (Base t) a s -> (Base t (t, s) -> a) -> t -> a
+  gpara = gzygo embed
 
   -- | Fokkinga's prepromorphism
   prepro
@@ -176,19 +172,24 @@ class Functor (Base t) => Recursive t where
 
   --- | A generalized prepromorphism
   gprepro
-    :: (Corecursive t, Comonad w)
-    => (forall b. Base t (w b) -> w (Base t b))
+    :: forall a s. Corecursive t
+    => Gather (Base t) a s
     -> (forall c. Base t c -> Base t c)
-    -> (Base t (w a) -> a)
+    -> (Base t s -> a)
     -> t
     -> a
-  gprepro k e f = extract . c where c = fmap f . k . fmap (duplicate . c . cata (embed . e)) . project
+  gprepro gather e0 f = f . fmap (go e0) . project where
+    deeper :: (forall b. Base t b -> Base t b) -> (forall b. Base t b -> Base t b)
+    deeper e = e . e0
 
-distPara :: Corecursive t => Base t (t, a) -> (t, Base t a)
-distPara = distZygo embed
+    go :: (forall b. Base t b -> Base t b) -> t -> s
+    go e = uncurry gather . (f &&& id) . fmap (go (deeper e)) . e . project
 
-distParaT :: (Corecursive t, Comonad w) => (forall b. Base t (w b) -> w (Base t b)) -> Base t (EnvT t w a) -> EnvT t w (Base t a)
-distParaT t = distZygoT embed t
+gatherPara :: Corecursive t => Gather (Base t) a (t, a)
+gatherPara = gatherZygo embed
+
+gatherParaT :: Corecursive t => Gather (Base t) a s -> Gather (Base t) a (t, s)
+gatherParaT = gatherZygoT embed
 
 class Functor (Base t) => Corecursive t where
   embed :: Base t t -> t
@@ -212,13 +213,18 @@ class Functor (Base t) => Corecursive t where
 
   -- | A generalized postpromorphism
   gpostpro
-    :: (Recursive t, Monad m)
-    => (forall b. m (Base t b) -> Base t (m b)) -- distributive law
-    -> (forall c. Base t c -> Base t c)         -- natural transformation
-    -> (a -> Base t (m a))                      -- a (Base t)-m-coalgebra
-    -> a                                        -- seed
+    :: forall a s. Recursive t
+    => Scatter (Base t) a s
+    -> (forall c. Base t c -> Base t c)
+    -> (a -> Base t s)
+    -> a
     -> t
-  gpostpro k e g = a . return where a = embed . fmap (ana (e . project) . a . join) . k . liftM g
+  gpostpro scatter e0 g = embed . fmap (go e0) . g where
+    deeper :: (forall c. Base t c -> Base t c) -> (forall c. Base t c -> Base t c)
+    deeper e = e . e0
+
+    go :: (forall c. Base t c -> Base t c) -> s -> t
+    go e = embed . e . fmap (go (deeper e)) . (g ||| id) . scatter
 
 hylo :: Functor f => (f b -> b) -> (a -> f a) -> a -> b
 hylo f g = h where h = f . fmap h . g
@@ -376,9 +382,9 @@ improveF x = CMFC.improve (CMFC.fromF x)
 instance Functor f => Corecursive (Free f a) where
   embed (CMTF.Pure a) = Pure a
   embed (CMTF.Free f) = Free f
-  ana               coalg = improveF . ana               coalg
-  postpro       nat coalg = improveF . postpro       nat coalg
-  gpostpro dist nat coalg = improveF . gpostpro dist nat coalg
+  ana                  coalg = improveF . ana                  coalg
+  postpro          nat coalg = improveF . postpro          nat coalg
+  gpostpro scatter nat coalg = improveF . gpostpro scatter nat coalg
 
 -- | Free transformations of monads are Recursive/Corecursive
 type instance Base (FreeT f m a) = Compose m (FreeF f a)
@@ -407,60 +413,65 @@ instance Corecursive (Either a b) where embed = getConst
 
 -- | A generalized catamorphism
 gfold, gcata
-  :: (Recursive t, Comonad w)
-  => (forall b. Base t (w b) -> w (Base t b)) -- ^ a distributive law
-  -> (Base t (w a) -> a)                      -- ^ a (Base t)-w-algebra
-  -> t                                        -- ^ fixed point
+  :: forall t a s. Recursive t
+  => Gather (Base t) a s
+  -> (Base t s -> a)
+  -> t
   -> a
-gcata k g = g . extract . c where
-  c = k . fmap (duplicate . fmap g . c) . project
-gfold k g t = gcata k g t
+gcata gather f = f . fmap go . project where
+  go :: t -> s
+  go = uncurry gather . (f &&& id) . fmap go . project
+gfold gather f t = gcata gather f t
 
-distCata :: Functor f => f (Identity a) -> Identity (f a)
-distCata = Identity . fmap runIdentity
+type Gather f a s = a -> f s -> s
+
+gatherCata :: Gather f a a
+gatherCata = const
 
 -- | A generalized anamorphism
 gunfold, gana
-  :: (Corecursive t, Monad m)
-  => (forall b. m (Base t b) -> Base t (m b)) -- ^ a distributive law
-  -> (a -> Base t (m a))                      -- ^ a (Base t)-m-coalgebra
-  -> a                                        -- ^ seed
+  :: forall t a s. Corecursive t
+  => Scatter (Base t) a s
+  -> (a -> Base t s)
+  -> a
   -> t
-gana k f = a . return . f where
-  a = embed . fmap (a . liftM f . join) . k
-gunfold k f t = gana k f t
+gana scatter g = embed . fmap go . g where
+  go :: s -> t
+  go = embed . fmap go . (g ||| id) . scatter
+gunfold scatter g t = gana scatter g t
 
-distAna :: Functor f => Identity (f a) -> f (Identity a)
-distAna = fmap Identity . runIdentity
+type Scatter f a s = s -> Either a (f s)
+
+scatterAna :: Functor f => Scatter f a a
+scatterAna = Left
 
 -- | A generalized hylomorphism
 grefold, ghylo
-  :: (Comonad w, Functor f, Monad m)
-  => (forall c. f (w c) -> w (f c))
-  -> (forall d. m (f d) -> f (m d))
-  -> (f (w b) -> b)
-  -> (a -> f (m a))
+  :: forall f a b s r. Functor f
+  => Gather f b r
+  -> Scatter f a s
+  -> (f r -> b)
+  -> (a -> f s)
   -> a
   -> b
-ghylo w m f g = extract . h . return where
-  h = fmap f . w . fmap (duplicate . h . join) . m . liftM g
-grefold w m f g a = ghylo w m f g a
+ghylo gather scatter f g = f . fmap go . g where
+  go :: s -> r
+  go = uncurry gather . (f &&& id) . fmap go . (g ||| id) . scatter
+grefold gather scatter f g a = ghylo gather scatter f g a
 
 futu :: Corecursive t => (a -> Base t (Free (Base t) a)) -> a -> t
-futu = gana distFutu
+futu = gana scatterFutu
 
-gfutu :: (Corecursive t, Functor m, Monad m) => (forall b. m (Base t b) -> Base t (m b)) -> (a -> Base t (FreeT (Base t) m a)) -> a -> t
-gfutu g = gana (distGFutu g)
+gfutu :: Corecursive t => Scatter (Base t) a s -> (a -> Base t (Free (Base t) s)) -> a -> t
+gfutu scatter = gana (scatterGFutu scatter)
 
-distFutu :: Functor f => Free f (f a) -> f (Free f a)
-distFutu (Pure fx) = Pure <$> fx
-distFutu (Free ff) = Free . distFutu <$> ff
+scatterFutu :: Functor f => Scatter f a (Free f a)
+scatterFutu (Pure a)  = Left a
+scatterFutu (Free ff) = Right ff
 
-distGFutu :: (Functor f, Functor h) => (forall b. h (f b) -> f (h b)) -> FreeT f h (f a) -> f (FreeT f h a)
-distGFutu k = d where
-  d = fmap FreeT . k . fmap d' . runFreeT
-  d' (CMTF.Pure ff) = CMTF.Pure <$> ff
-  d' (CMTF.Free ff) = CMTF.Free . d <$> ff
+scatterGFutu :: Functor f => Scatter f a s -> Scatter f a (Free f s)
+scatterGFutu scatter (Pure s)  = fmap Pure <$> scatter s
+scatterGFutu _       (Free ff) = Right ff
 
 -------------------------------------------------------------------------------
 -- Fix
@@ -628,70 +639,69 @@ hoistNu n (Nu next seed) = Nu (n . next) seed
 
 
 zygo :: Recursive t => (Base t b -> b) -> (Base t (b, a) -> a) -> t -> a
-zygo f = gfold (distZygo f)
+zygo f = gfold (gatherZygo f)
 
-distZygo
+gatherZygo
   :: Functor f
-  => (f b -> b)             -- An f-algebra
-  -> (f (b, a) -> (b, f a)) -- ^ A distributive for semi-mutual recursion
-distZygo g m = (g (fmap fst m), fmap snd m)
+  => (f b -> b)        -- An f-algebra
+  -> Gather f a (b, a) -- ^ A gathering function for semi-mutual recursion
+gatherZygo g x fyx = (g $ fst <$> fyx, x)
 
 gzygo
-  :: (Recursive t, Comonad w)
+  :: Recursive t
   => (Base t b -> b)
-  -> (forall c. Base t (w c) -> w (Base t c))
-  -> (Base t (EnvT b w a) -> a)
+  -> Gather (Base t) a s
+  -> (Base t (b, s) -> a)
   -> t
   -> a
-gzygo f w = gfold (distZygoT f w)
+gzygo f gather = gfold (gatherZygoT f gather)
 
-distZygoT
-  :: (Functor f, Comonad w)
-  => (f b -> b)                        -- An f-w-algebra to use for semi-mutual recursion
-  -> (forall c. f (w c) -> w (f c))    -- A base Distributive law
-  -> f (EnvT b w a) -> EnvT b w (f a)  -- A new distributive law that adds semi-mutual recursion
-distZygoT g k fe = EnvT (g (getEnv <$> fe)) (k (lower <$> fe))
-  where getEnv (EnvT e _) = e
+gatherZygoT
+  :: Functor f
+  => (f b -> b)
+  -> Gather f a s      -- A base gathering function
+  -> Gather f a (b, s) -- A new gathering function that adds semi-mutual recursion
+gatherZygoT f gather x = (f . fmap fst) &&& (gather x . fmap snd)
 
 gapo :: Corecursive t => (b -> Base t b) -> (a -> Base t (Either b a)) -> a -> t
-gapo g = gunfold (distGApo g)
+gapo g = gunfold (scatterGApo g)
 
-distApo :: Recursive t => Either t (Base t a) -> Base t (Either t a)
-distApo = distGApo project
+scatterApo :: Recursive t => Scatter (Base t) a (Either t a)
+scatterApo = scatterGApo project
 
-distGApo :: Functor f => (b -> f b) -> Either b (f a) -> f (Either b a)
-distGApo f = either (fmap Left . f) (fmap Right)
+scatterGApo :: Functor f => (b -> f b) -> Scatter f a (Either b a)
+scatterGApo g = scatterGApoT g scatterAna
 
-distGApoT
-  :: (Functor f, Functor m)
+scatterGApoT
+  :: Functor f
   => (b -> f b)
-  -> (forall c. m (f c) -> f (m c))
-  -> ExceptT b m (f a)
-  -> f (ExceptT b m a)
-distGApoT g k = fmap ExceptT . k . fmap (distGApo g) . runExceptT
+  -> Scatter f a s
+  -> Scatter f a (Either b s)
+scatterGApoT g _       (Left  b) = Right $ Left <$> g b
+scatterGApoT _ scatter (Right s) = fmap Right <$> scatter s
 
 -- | Course-of-value iteration
 histo :: Recursive t => (Base t (Cofree (Base t) a) -> a) -> t -> a
-histo = gcata distHisto
+histo = gcata gatherHisto
 
-ghisto :: (Recursive t, Comonad w) => (forall b. Base t (w b) -> w (Base t b)) -> (Base t (CofreeT (Base t) w a) -> a) -> t -> a
-ghisto g = gcata (distGHisto g)
+ghisto :: Recursive t => Gather (Base t) a s -> (Base t (Cofree (Base t) s) -> a) -> t -> a
+ghisto gather = gcata (gatherGHisto gather)
 
-distHisto :: Functor f => f (Cofree f a) -> Cofree f (f a)
-distHisto fc = fmap extract fc :< fmap (distHisto . Cofree.unwrap) fc
+gatherHisto :: Functor f => Gather f a (Cofree f a)
+gatherHisto = (:<)
 
-distGHisto :: (Functor f, Functor h) => (forall b. f (h b) -> h (f b)) -> f (CofreeT f h a) -> CofreeT f h (f a)
-distGHisto k = d where d = CofreeT . fmap (\fc -> fmap CCTC.headF fc CCTC.:< fmap (d . CCTC.tailF) fc) . k . fmap runCofreeT
+gatherGHisto :: Functor f => Gather f a s -> Gather f a (Cofree f s)
+gatherGHisto gather x fc = gather x (extract <$> fc) :< fc
 
 chrono :: Functor f => (f (Cofree f b) -> b) -> (a -> f (Free f a)) -> (a -> b)
-chrono = ghylo distHisto distFutu
+chrono = ghylo gatherHisto scatterFutu
 
-gchrono :: (Functor f, Functor w, Functor m, Comonad w, Monad m) =>
-           (forall c. f (w c) -> w (f c)) ->
-           (forall c. m (f c) -> f (m c)) ->
-           (f (CofreeT f w b) -> b) -> (a -> f (FreeT f m a)) ->
+gchrono :: Functor f =>
+           Gather f b r ->
+           Scatter f a s ->
+           (f (Cofree f r) -> b) -> (a -> f (Free f s)) ->
            (a -> b)
-gchrono w m = ghylo (distGHisto w) (distGFutu m)
+gchrono gather scatter = ghylo (gatherGHisto gather) (scatterGFutu scatter)
 
 -- | Mendler-style iteration
 mcata :: (forall y. (y -> c) -> f y -> c) -> Fix f -> c
@@ -716,10 +726,10 @@ zygoHistoPrepro
   :: (Corecursive t, Recursive t)
   => (Base t b -> b)
   -> (forall c. Base t c -> Base t c)
-  -> (Base t (EnvT b (Cofree (Base t)) a) -> a)
+  -> (Base t (b, Cofree (Base t) a) -> a)
   -> t
   -> a
-zygoHistoPrepro f g t = gprepro (distZygoT f distHisto) g t
+zygoHistoPrepro f g t = gprepro (gatherZygoT f gatherHisto) g t
 
 -------------------------------------------------------------------------------
 -- Not exposed anywhere
