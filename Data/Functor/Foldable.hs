@@ -46,7 +46,7 @@ module Data.Functor.Foldable
     Base
   , ListF(..)
   -- * Fixed points
-  , Fix(..), unfix, hoistFix
+  , Fix(..), unfix
   , Mu(..), hoistMu
   , Nu(..), hoistNu
   -- * Folding
@@ -85,6 +85,7 @@ module Data.Functor.Foldable
   , hylo
   , ghylo
   -- ** Changing representation
+  , hoist
   , refix
   -- * Common names
   , fold, gfold
@@ -172,7 +173,7 @@ class Functor (Base t) => Recursive t where
     -> (Base t a -> a)
     -> t
     -> a
-  prepro e f = c where c = f . fmap (c . cata (embed . e)) . project
+  prepro e f = c where c = f . fmap (c . hoist e) . project
 
   --- | A generalized prepromorphism
   gprepro
@@ -182,7 +183,7 @@ class Functor (Base t) => Recursive t where
     -> (Base t (w a) -> a)
     -> t
     -> a
-  gprepro k e f = extract . c where c = fmap f . k . fmap (duplicate . c . cata (embed . e)) . project
+  gprepro k e f = extract . c where c = fmap f . k . fmap (duplicate . c . hoist e) . project
 
 distPara :: Corecursive t => Base t (t, a) -> (t, Base t a)
 distPara = distZygo embed
@@ -208,7 +209,7 @@ class Functor (Base t) => Corecursive t where
     -> (a -> Base t a)                  -- a (Base t)-coalgebra
     -> a                                -- seed
     -> t
-  postpro e g = a where a = embed . fmap (ana (e . project) . a) . g
+  postpro e g = a where a = embed . fmap (hoist e . a) . g
 
   -- | A generalized postpromorphism
   gpostpro
@@ -218,7 +219,7 @@ class Functor (Base t) => Corecursive t where
     -> (a -> Base t (m a))                      -- a (Base t)-m-coalgebra
     -> a                                        -- seed
     -> t
-  gpostpro k e g = a . return where a = embed . fmap (ana (e . project) . a . join) . k . liftM g
+  gpostpro k e g = a . return where a = embed . fmap (hoist e . a . join) . k . liftM g
 
 hylo :: Functor f => (f b -> b) -> (a -> f a) -> a -> b
 hylo f g = h where h = f . fmap h . g
@@ -528,6 +529,10 @@ instance Functor f => Recursive (Fix f) where
 instance Functor f => Corecursive (Fix f) where
   embed = Fix
 
+hoist :: (Recursive s, Corecursive t)
+      => (forall a. Base s a -> Base t a) -> s -> t
+hoist n = cata (embed . n)
+
 refix :: (Recursive s, Corecursive t, Base s ~ Base t) => s -> t
 refix = cata embed
 
@@ -536,10 +541,6 @@ toFix = refix
 
 fromFix :: Corecursive t => Fix (Base t) -> t
 fromFix = refix
-
-hoistFix :: Functor f
-         => (forall a. f a -> g a) -> Fix f -> Fix g
-hoistFix n = cata (Fix . n)
 
 
 -------------------------------------------------------------------------------
@@ -579,8 +580,8 @@ instance (Functor f, Read1 f) => Read (Mu f) where
     fromFix <$> step readPrec
 #endif
 
-hoistMu :: Functor f
-        => (forall a. f a -> g a) -> Mu f -> Mu g
+-- | A specialized, faster version of 'hoist' for 'Mu'.
+hoistMu :: (forall a. f a -> g a) -> Mu f -> Mu g
 hoistMu n (Mu mk) = Mu $ \roll -> mk (roll . n)
 
 
@@ -622,8 +623,8 @@ instance (Functor f, Read1 f) => Read (Nu f) where
     fromFix <$> step readPrec
 #endif
 
-hoistNu :: Functor g
-        => (forall a. f a -> g a) -> Nu f -> Nu g
+-- | A specialized, faster version of 'hoist' for 'Nu'.
+hoistNu :: (forall a. f a -> g a) -> Nu f -> Nu g
 hoistNu n (Nu next seed) = Nu (n . next) seed
 
 
