@@ -1,22 +1,5 @@
 {-# LANGUAGE CPP, TypeFamilies, Rank2Types, FlexibleContexts, FlexibleInstances, GADTs, StandaloneDeriving, UndecidableInstances #-}
-
--- explicit dictionary higher-kind instances are defined in
--- - base-4.9
--- - transformers >= 0.5
--- - transformes-compat >= 0.5 when transformers aren't 0.4
---
--- We don't always depend on transformers-compat, so we need a shim for its version check.
-#ifndef MIN_VERSION_transformers_compat
-#define MIN_VERSION_transformers_compat(x,y,z) 0
-#endif
-
-#define EXPLICIT_DICT_FUNCTOR_CLASSES (MIN_VERSION_base(4,9,0) || MIN_VERSION_transformers(0,5,0) || (MIN_VERSION_transformers_compat(0,5,0) && !MIN_VERSION_transformers(0,4,0)))
-
-#define HAS_GENERIC (__GLASGOW_HASKELL__ >= 702)
-#define HAS_GENERIC1 (__GLASGOW_HASKELL__ >= 706)
-
--- Polymorphic typeable
-#define HAS_POLY_TYPEABLE MIN_VERSION_base(4,7,0)
+#include "recursion-schemes-common.h"
 
 #ifdef __GLASGOW_HASKELL__
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -27,8 +10,6 @@
 {-# LANGUAGE DeriveGeneric #-}
 #endif
 #endif
-
-
 
 -----------------------------------------------------------------------------
 -- |
@@ -244,7 +225,7 @@ data ListF a b = Nil | Cons a b
 #endif
           )
 
-#if EXPLICIT_DICT_FUNCTOR_CLASSES
+#ifdef LIFTED_FUNCTOR_CLASSES
 instance Eq2 ListF where
   liftEq2 _ _ Nil        Nil          = True
   liftEq2 f g (Cons a b) (Cons a' b') = f a a' && g b b'
