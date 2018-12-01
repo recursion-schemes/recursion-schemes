@@ -26,3 +26,5 @@
 #define HAS_GENERIC1 (__GLASGOW_HASKELL__ >= 706)
 
 #define HAS_POLY_TYPEABLE MIN_VERSION_base(4,7,0)
+
+#define HAS_VOID MIN_VERSION_base(4,8,0)

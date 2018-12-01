@@ -117,6 +117,9 @@ import GHC.Generics (Generic)
 import GHC.Generics (Generic1)
 #endif
 #endif
+#if HAS_VOID
+import Data.Void
+#endif
 import Numeric.Natural
 import Data.Monoid (Monoid (..))
 import Prelude
@@ -317,6 +320,16 @@ instance Corecursive [a] where
     Cons x (Left xs) -> x : xs
     Cons x (Right b) -> x : apo f b
     Nil -> []
+
+#if HAS_VOID
+-- | @Fix Identity@ is equivalent to the following definition of 'Void':
+-- > newtype Void = Void Void
+type instance Base Void = Identity
+instance Recursive Void where
+  project = Identity
+instance Corecursive Void where
+  embed = runIdentity
+#endif
 
 type instance Base (NonEmpty a) = NonEmptyF a
 instance Recursive (NonEmpty a) where
