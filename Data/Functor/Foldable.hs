@@ -80,6 +80,9 @@ module Data.Functor.Foldable
   , coelgot
   -- * Zygohistomorphic prepromorphisms
   , zygoHistoPrepro
+  -- * Effectful combinators
+  , cataA
+  , transverse
   ) where
 
 import Control.Applicative
@@ -702,6 +705,53 @@ zygoHistoPrepro
   -> t
   -> a
 zygoHistoPrepro f g t = gprepro (distZygoT f distHisto) g t
+
+-------------------------------------------------------------------------------
+-- Effectful combinators
+-------------------------------------------------------------------------------
+
+-- | Effectful |fold|.
+--
+-- This is a type specialisation of 'cata'.
+--
+-- An example terminating a recursion immediately:
+--
+-- >>> cataA (\alg -> case alg of { Nil -> pure (); Cons a _ -> Const [a] })  "hello"
+-- Const "h"
+--
+cataA :: (Recursive t) => (Base t (f a) -> f a) -> t -> f a
+cataA = cata
+
+-- | An effectful version of 'hoist'.
+--
+-- Properties:
+--
+-- @
+-- 'transverse' 'sequenceA' = 'pure'
+-- @
+--
+-- Examples:
+--
+-- The weird type of first argument allows user to decide
+-- an order of sequencing:
+--
+-- >>> transverse (\x -> print (void x) *> sequence x) "foo" :: IO String
+-- Cons 'f' ()
+-- Cons 'o' ()
+-- Cons 'o' ()
+-- Nil
+-- "foo"
+--
+-- >>> transverse (\x -> sequence x <* print (void x)) "foo" :: IO String
+-- Nil
+-- Cons 'o' ()
+-- Cons 'o' ()
+-- Cons 'f' ()
+-- "foo"
+--
+transverse :: (Recursive s, Corecursive t, Functor f)
+           => (forall a. Base s (f a) -> f (Base t a)) -> s -> f t
+transverse n = cata (fmap embed . n)
 
 -------------------------------------------------------------------------------
 -- Not exposed anywhere
