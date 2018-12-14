@@ -1,8 +1,9 @@
-## (next version)
+## 5.1
 * Export gfutu
 * `distGHisto`, `ghisto`, and `gchrono` now use `Cofree (Base t)`
 * `distGFutu`, `gfutu`, and `gchrono` now use `Free (Base t)`
 * Add `hoist`, `hoistMu` and `hoistNu`
+* Add `transverse` and `cataA`
 
 ## 5.0.3 [2018.07.01]
 * Make the Template Haskell machinery look through type synonyms.
