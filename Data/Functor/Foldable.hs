@@ -710,7 +710,7 @@ zygoHistoPrepro f g t = gprepro (distZygoT f distHisto) g t
 -- Effectful combinators
 -------------------------------------------------------------------------------
 
--- | Effectful |fold|.
+-- | Effectful 'fold'.
 --
 -- This is a type specialisation of 'cata'.
 --
