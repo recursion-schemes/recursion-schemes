@@ -1,3 +1,6 @@
+## next [????.??.??]
+* Support `th-abstraction-0.3.0.0` or later.
+
 ## 5.1.2
 * Make the `Generic`-based instances to also support data constructors with zero
   arguments (and datatypes with zero constructors).
