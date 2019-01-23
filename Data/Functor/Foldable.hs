@@ -475,7 +475,7 @@ unfold = ana
 refold :: Functor f => (f b -> b) -> (a -> f a) -> a -> b
 refold = hylo
 
--- | Base functor of @[]@.
+-- | Base functor of @[a]@.
 data ListF a b = Nil | Cons a b
   deriving (Eq,Ord,Show,Read,Typeable
 #if HAS_GENERIC
