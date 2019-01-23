@@ -809,8 +809,13 @@ distGFutu k = d where
 -- > ["foo", "bar"]
 -- > Fix (Cons "foo" (Fix (Cons "bar" (Fix Nil))))
 --
--- Unlike 'Mu' and 'Nu', this representation is concrete, so we can
--- pattern-match on the constructors of @f@.
+-- 'Fix', 'Mu' and 'Nu' are all equivalent, except when 'f' is strict. If 'Cons'
+-- was strict in its second argument, any attempt to define an infinite list of
+-- type @Fix ListF@ would result in bottom.
+--
+-- Of the three, 'Fix' is the most common way to express a fixpoint, as it has
+-- the advantage that when pattern-matching on a value of type @Fix f@, we can
+-- directly pattern-match on the constructors of @f@.
 newtype Fix f = Fix (f (Fix f))
 
 unfix :: Fix f -> f (Fix f)
@@ -906,12 +911,19 @@ colambek = ana (fmap project)
 -- The least fixed point of 'f', in the sense that if we did not have general
 -- recursion, we would be forced to use the @f a -> a@ argument a finite number
 -- of times and so we could only construct finite values. Since we do have
--- general recursion, 'Fix', 'Mu' and 'Nu' are all equivalent.
+-- general recursion, 'Fix', 'Mu' and 'Nu' are all equivalent, except when 'f'
+-- is strict.
 --
 -- For example, @Fix (ListF String)@ and @Mu (ListF String)@ are isomorphic:
 --
 -- > Fix         (Cons "foo" (Fix (Cons "bar" (Fix Nil))))
 -- > Mu (\f -> f (Cons "foo" (f   (Cons "bar" (f   Nil)))))
+--
+-- If 'Cons' was strict in its second argument, it would technically be
+-- possible to represent an infinite list as @Mu go@ if 'go' calls its argument
+-- 'f' infinitely-many times, but that would not be a very useful
+-- representation because 'go' would return bottom whenever it is given an 'f'
+-- which examines its @ListF a@ argument.
 newtype Mu f = Mu (forall a. (f a -> a) -> a)
 type instance Base (Mu f) = f
 instance Functor f => Recursive (Mu f) where
@@ -959,12 +971,19 @@ instance Functor f => Corecursive (CMFC.F f a) where
 -- The greatest fixed point of 'f', in the sense that even if we did not have
 -- general recursion, we could still describe an infinite list by defining an
 -- @a -> ListF Int a@ function which always returns a 'Cons'. Since we do have
--- general recursion, 'Fix', 'Mu' and 'Nu' are all equivalent.
+-- general recursion, 'Fix', 'Mu' and 'Nu' are all equivalent, except when 'f'
+-- is strict.
 --
 -- For example, @Fix (ListF String)@ and @Nu (ListF String)@ are isomorphic:
 --
 -- > Fix            (Cons "foo" (Fix   (Cons "bar" (Fix    Nil))))
 -- > Nu (\case {0 -> Cons "foo" 1; 1 -> Cons "bar" 2; _ -> Nil}) 0
+--
+-- If 'Cons' was strict in its second argument, it would still be possible to
+-- represent an infinite list of 42's as @Nu (Cons 42) Nil@. Since strictness
+-- is often used to express the requirement that the values of a datatype must
+-- be finite, 'Nu' can be thought of as a way to override that requirement, by
+-- allowing infinite values as well as finite ones.
 data Nu f where Nu :: (a -> f a) -> a -> Nu f
 type instance Base (Nu f) = f
 instance Functor f => Corecursive (Nu f) where
