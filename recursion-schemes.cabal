@@ -1,6 +1,6 @@
 name:          recursion-schemes
 category:      Control, Recursion
-version:       5.0.2
+version:       5.1
 license:       BSD3
 cabal-version: >= 1.8
 license-file:  LICENSE
@@ -16,10 +16,10 @@ description:
   "Generalized bananas, lenses and barbed wire"
   by Erik Meijer, Maarten Fokkinga and Ross Paterson.
 
-tested-with:   GHC==7.4.2, GHC==7.6.3, GHC==7.8.4, GHC==7.10.3, GHC==8.0.2, GHC==8.2.2, GHC==8.4.2
+tested-with:   GHC==7.4.2, GHC==7.6.3, GHC==7.8.4, GHC==7.10.3, GHC==8.0.2, GHC==8.2.2, GHC==8.4.4, GHC==8.6.3
 
 build-type:    Simple
-extra-source-files: .travis.yml CHANGELOG.markdown .gitignore README.markdown
+extra-source-files: .travis.yml CHANGELOG.markdown .gitignore README.markdown include/recursion-schemes-common.h
 
 source-repository head
   type: git
@@ -40,6 +40,9 @@ library
     GADTs
     StandaloneDeriving
     UndecidableInstances
+
+  include-dirs: include
+  -- includes: recursion-schemes-common.h
 
   build-depends:
     base                 >= 4.5     && < 5,
@@ -76,9 +79,9 @@ library
 
   if flag(template-haskell)
     build-depends:
-      template-haskell >= 2.5.0.0 && < 2.14,
-      base-orphans     >= 0.5.4   && < 0.8,
-      th-abstraction   >= 0.2.4   && < 1
+      template-haskell >= 2.5.0.0 && < 2.15,
+      base-orphans     >= 0.5.4   && < 0.9,
+      th-abstraction   >= 0.2.4   && < 0.3
     exposed-modules:
       Data.Functor.Foldable.TH
 
@@ -96,5 +99,5 @@ test-suite Expr
     base,
     HUnit <1.7,
     recursion-schemes,
-    template-haskell >= 2.5.0.0 && < 2.14,
+    template-haskell,
     transformers     >= 0.2     && < 1

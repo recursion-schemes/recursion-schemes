@@ -1,22 +1,5 @@
 {-# LANGUAGE CPP, TypeFamilies, Rank2Types, FlexibleContexts, FlexibleInstances, GADTs, StandaloneDeriving, UndecidableInstances #-}
-
--- explicit dictionary higher-kind instances are defined in
--- - base-4.9
--- - transformers >= 0.5
--- - transformes-compat >= 0.5 when transformers aren't 0.4
---
--- We don't always depend on transformers-compat, so we need a shim for its version check.
-#ifndef MIN_VERSION_transformers_compat
-#define MIN_VERSION_transformers_compat(x,y,z) 0
-#endif
-
-#define EXPLICIT_DICT_FUNCTOR_CLASSES (MIN_VERSION_base(4,9,0) || MIN_VERSION_transformers(0,5,0) || (MIN_VERSION_transformers_compat(0,5,0) && !MIN_VERSION_transformers(0,4,0)))
-
-#define HAS_GENERIC (__GLASGOW_HASKELL__ >= 702)
-#define HAS_GENERIC1 (__GLASGOW_HASKELL__ >= 706)
-
--- Polymorphic typeable
-#define HAS_POLY_TYPEABLE MIN_VERSION_base(4,7,0)
+#include "recursion-schemes-common.h"
 
 #ifdef __GLASGOW_HASKELL__
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -27,8 +10,6 @@
 {-# LANGUAGE DeriveGeneric #-}
 #endif
 #endif
-
-
 
 -----------------------------------------------------------------------------
 -- |
@@ -47,8 +28,8 @@ module Data.Functor.Foldable
   , ListF(..)
   -- * Fixed points
   , Fix(..), unfix
-  , Mu(..)
-  , Nu(..)
+  , Mu(..), hoistMu
+  , Nu(..), hoistNu
   -- * Folding
   , Recursive(..)
   -- ** Combinators
@@ -85,6 +66,7 @@ module Data.Functor.Foldable
   , chrono
   , gchrono
   -- ** Changing representation
+  , hoist
   , refix
   -- * Common names
   , fold, gfold
@@ -98,6 +80,9 @@ module Data.Functor.Foldable
   , coelgot
   -- * Zygohistomorphic prepromorphisms
   , zygoHistoPrepro
+  -- * Effectful combinators
+  , cataA
+  , transverse
   ) where
 
 import Control.Applicative
@@ -282,7 +267,7 @@ class Functor (Base t) => Recursive t where
     -> (Base t a -> a)
     -> t
     -> a
-  prepro e f = c where c = f . fmap (c . cata (embed . e)) . project
+  prepro e f = c where c = f . fmap (c . hoist e) . project
 
   -- | A generalized prepromorphism. Like 'prepro', the natural transformation
   -- is applied /n/ times to the base functors at depth /n/. The results are
@@ -341,7 +326,7 @@ class Functor (Base t) => Recursive t where
     -> (Base t (w a) -> a)
     -> t
     -> a
-  gprepro k e f = extract . c where c = fmap f . k . fmap (duplicate . c . cata (embed . e)) . project
+  gprepro k e f = extract . c where c = fmap f . k . fmap (duplicate . c . hoist e) . project
 
 distPara :: Corecursive t => Base t (t, a) -> (t, Base t a)
 distPara = distZygo embed
@@ -423,7 +408,7 @@ class Functor (Base t) => Corecursive t where
     -> (a -> Base t a)                  -- a (Base t)-coalgebra
     -> a                                -- seed
     -> t
-  postpro e g = a where a = embed . fmap (ana (e . project) . a) . g
+  postpro e g = a where a = embed . fmap (hoist e . a) . g
 
   -- | A generalized postpromorphism. The seed is expanded using the operation
   -- corresponding to the given distributive law, and then like in 'postpro',
@@ -454,7 +439,7 @@ class Functor (Base t) => Corecursive t where
     -> (a -> Base t (m a))                      -- a (Base t)-m-coalgebra
     -> a                                        -- seed
     -> t
-  gpostpro k e g = a . return where a = embed . fmap (ana (e . project) . a . join) . k . liftM g
+  gpostpro k e g = a . return where a = embed . fmap (hoist e . a . join) . k . liftM g
 
 -- | An optimized version of @cata f . ana g@.
 --
@@ -501,7 +486,7 @@ data ListF a b = Nil | Cons a b
 #endif
           )
 
-#if EXPLICIT_DICT_FUNCTOR_CLASSES
+#ifdef LIFTED_FUNCTOR_CLASSES
 instance Eq2 ListF where
   liftEq2 _ _ Nil        Nil          = True
   liftEq2 f g (Cons a b) (Cons a' b') = f a a' && g b b'
@@ -800,7 +785,7 @@ grefold w m f g a = ghylo w m f g a
 futu :: Corecursive t => (a -> Base t (Free (Base t) a)) -> a -> t
 futu = gana distFutu
 
-gfutu :: (Corecursive t, Monad m) => (forall b. m (Base t b) -> Base t (m b)) -> (a -> Base t (FreeT (Base t) m a)) -> a -> t
+gfutu :: (Corecursive t, Functor m, Monad m) => (forall b. m (Base t b) -> Base t (m b)) -> (a -> Base t (FreeT (Base t) m a)) -> a -> t
 gfutu g = gana (distGFutu g)
 
 distFutu :: Functor f => Free f (f a) -> f (Free f a)
@@ -888,6 +873,10 @@ instance Functor f => Recursive (Fix f) where
 instance Functor f => Corecursive (Fix f) where
   embed = Fix
 
+hoist :: (Recursive s, Corecursive t)
+      => (forall a. Base s a -> Base t a) -> s -> t
+hoist n = cata (embed . n)
+
 -- |
 -- >>> refix ["foo", "bar"] :: Fix (ListF String)
 -- Fix (Cons "foo" (Fix (Cons "bar" (Fix Nil))))
@@ -899,6 +888,7 @@ toFix = refix
 
 fromFix :: Corecursive t => Fix (Base t) -> t
 fromFix = refix
+
 
 -------------------------------------------------------------------------------
 -- Lambek
@@ -947,6 +937,11 @@ instance (Functor f, Read1 f) => Read (Mu f) where
     fromFix <$> step readPrec
 #endif
 
+-- | A specialized, faster version of 'hoist' for 'Mu'.
+hoistMu :: (forall a. f a -> g a) -> Mu f -> Mu g
+hoistMu n (Mu mk) = Mu $ \roll -> mk (roll . n)
+
+
 -- | Church encoded free monads are Recursive/Corecursive, in the same way that
 -- 'Mu' is.
 type instance Base (CMFC.F f a) = FreeF f a
@@ -958,6 +953,7 @@ instance Functor f => Recursive (CMFC.F f a) where
 instance Functor f => Corecursive (CMFC.F f a) where
   embed (CMTF.Pure a)  = CMFC.F $ \p _ -> p a
   embed (CMTF.Free fr) = CMFC.F $ \p f -> f $ fmap (cmfcCata p f) fr
+
 
 -- |
 -- The greatest fixed point of 'f', in the sense that even if we did not have
@@ -993,6 +989,11 @@ instance (Functor f, Read1 f) => Read (Nu f) where
     Ident "fromFix" <- lexP
     fromFix <$> step readPrec
 #endif
+
+-- | A specialized, faster version of 'hoist' for 'Nu'.
+hoistNu :: (forall a. f a -> g a) -> Nu f -> Nu g
+hoistNu n (Nu next seed) = Nu (n . next) seed
+
 
 -- | A variant of 'para' in which instead of also giving the original sub-tree,
 -- the recursive positions give the result of applying a 'cata' to that
@@ -1186,7 +1187,7 @@ chrono = ghylo distHisto distFutu
 -- >
 -- >   writeBool :: Bool -> Free (ListF Bool) ()
 -- >   writeBool b = FreeT $ Identity $ Free $ Cons b $ pure ()
-gchrono :: (Functor f, Comonad w, Monad m) =>
+gchrono :: (Functor f, Functor w, Functor m, Comonad w, Monad m) =>
            (forall c. f (w c) -> w (f c)) ->
            (forall c. m (f c) -> f (m c)) ->
            (f (CofreeT f w b) -> b) -> (a -> f (FreeT f m a)) ->
@@ -1371,6 +1372,53 @@ zygoHistoPrepro
   -> t
   -> a
 zygoHistoPrepro f g t = gprepro (distZygoT f distHisto) g t
+
+-------------------------------------------------------------------------------
+-- Effectful combinators
+-------------------------------------------------------------------------------
+
+-- | Effectful 'fold'.
+--
+-- This is a type specialisation of 'cata'.
+--
+-- An example terminating a recursion immediately:
+--
+-- >>> cataA (\alg -> case alg of { Nil -> pure (); Cons a _ -> Const [a] })  "hello"
+-- Const "h"
+--
+cataA :: (Recursive t) => (Base t (f a) -> f a) -> t -> f a
+cataA = cata
+
+-- | An effectful version of 'hoist'.
+--
+-- Properties:
+--
+-- @
+-- 'transverse' 'sequenceA' = 'pure'
+-- @
+--
+-- Examples:
+--
+-- The weird type of first argument allows user to decide
+-- an order of sequencing:
+--
+-- >>> transverse (\x -> print (void x) *> sequence x) "foo" :: IO String
+-- Cons 'f' ()
+-- Cons 'o' ()
+-- Cons 'o' ()
+-- Nil
+-- "foo"
+--
+-- >>> transverse (\x -> sequence x <* print (void x)) "foo" :: IO String
+-- Nil
+-- Cons 'o' ()
+-- Cons 'o' ()
+-- Cons 'f' ()
+-- "foo"
+--
+transverse :: (Recursive s, Corecursive t, Functor f)
+           => (forall a. Base s (f a) -> f (Base t a)) -> s -> f t
+transverse n = cata (fmap embed . n)
 
 -------------------------------------------------------------------------------
 -- Not exposed anywhere
