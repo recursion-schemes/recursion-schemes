@@ -789,13 +789,13 @@ transverse n = cata (fmap embed . n)
 --       (Cons x a, Cons y b) -> Cons (f x y) (a, b)
 -- :}
 --
--- >>> zipWith (*) [1,2,3] [4,5,6]
+-- >>> zipWith' (*) [1,2,3] [4,5,6]
 -- [4,10,18]
 --
--- >>> zipWith (*) [1,2,3] [4,5,6,8]
+-- >>> zipWith' (*) [1,2,3] [4,5,6,8]
 -- [4,10,18]
 --
--- >>> zipWith (*) [1,2,3,3] [4,5,6]
+-- >>> zipWith' (*) [1,2,3,3] [4,5,6]
 -- [4,10,18]
 --
 cotransverse :: (Recursive s, Corecursive t, Functor f)
