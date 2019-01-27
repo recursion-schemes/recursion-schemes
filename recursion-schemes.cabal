@@ -1,6 +1,6 @@
 name:          recursion-schemes
 category:      Control, Recursion
-version:       5.1
+version:       5.1.1
 license:       BSD3
 cabal-version: >= 1.8
 license-file:  LICENSE
@@ -102,3 +102,5 @@ test-suite Expr
     recursion-schemes,
     template-haskell,
     transformers     >= 0.2     && < 1
+  if impl(ghc < 7.5)
+    build-depends: ghc-prim

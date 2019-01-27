@@ -1,5 +1,9 @@
-## next
+## 5.1.1
+
 * Add `cotransverse`
+* Add `Generic` based default implementation to `embed` and `project`.
+  `Recursive` and `Corecursive` can be `DeriveAnyClass`-derived now,
+  if you write the base functor by hand.
 
 ## 5.1
 * Export gfutu
