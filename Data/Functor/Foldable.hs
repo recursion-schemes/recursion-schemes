@@ -135,6 +135,10 @@ import qualified Data.Bitraversable as Bi
 import           Data.Functor.Base hiding (head, tail)
 import qualified Data.Functor.Base as NEF (NonEmptyF(..))
 
+-- $setup
+-- >>> import Control.Monad (void)
+-- >>> import Data.Char (toUpper)
+
 type family Base t :: * -> *
 
 class Functor (Base t) => Recursive t where
@@ -761,6 +765,39 @@ transverse n = cata (fmap embed . n)
 -- @
 -- 'cotransverse' 'distAna' = 'runIdentity'
 -- @
+--
+-- Examples:
+--
+-- Stateful transformations:
+--
+-- >>> :{
+-- cotransverse
+--   (\(u, b) -> case b of
+--     Nil -> Nil
+--     Cons x a -> Cons (if u then toUpper x else x) (not u, a))
+--   (True, "foobar") :: String
+-- :}
+-- "FoObAr"
+--
+-- We can implement `zipWith`
+--
+-- >>> :{
+-- let zipWith' :: (a -> b -> c) -> [a] -> [b] -> [c]
+--     zipWith' f = curry $ cotransverse $ \(xs, base) -> case (project xs, base) of
+--       (Nil,      _)        -> Nil
+--       (_,        Nil)      -> Nil
+--       (Cons x a, Cons y b) -> Cons (f x y) (a, b)
+-- :}
+--
+-- >>> zipWith (*) [1,2,3] [4,5,6]
+-- [4,10,18]
+--
+-- >>> zipWith (*) [1,2,3] [4,5,6,8]
+-- [4,10,18]
+--
+-- >>> zipWith (*) [1,2,3,3] [4,5,6]
+-- [4,10,18]
+--
 cotransverse :: (Recursive s, Corecursive t, Functor f)
              => (forall a. f (Base s a) -> Base t (f a)) -> f s -> t
 cotransverse n = ana (n . fmap project)

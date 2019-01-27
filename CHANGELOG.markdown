@@ -1,3 +1,6 @@
+## next
+* Add `cotransverse`
+
 ## 5.1
 * Export gfutu
 * `distGHisto`, `ghisto`, and `gchrono` now use `Cofree (Base t)`
