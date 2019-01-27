@@ -83,6 +83,7 @@ module Data.Functor.Foldable
   -- * Effectful combinators
   , cataA
   , transverse
+  , cotransverse
   ) where
 
 import Control.Applicative
@@ -752,6 +753,17 @@ cataA = cata
 transverse :: (Recursive s, Corecursive t, Functor f)
            => (forall a. Base s (f a) -> f (Base t a)) -> s -> f t
 transverse n = cata (fmap embed . n)
+
+-- | A coeffectful version of 'hoist'.
+--
+-- Properties:
+--
+-- @
+-- 'cotransverse' 'distAna' = 'runIdentity'
+-- @
+cotransverse :: (Recursive s, Corecursive t, Functor f)
+             => (forall a. f (Base s a) -> Base t (f a)) -> f s -> t
+cotransverse n = ana (n . fmap project)
 
 -------------------------------------------------------------------------------
 -- Not exposed anywhere
