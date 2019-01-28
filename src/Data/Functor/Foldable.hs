@@ -17,7 +17,9 @@
 -- Copyright   :  (C) 2008-2015 Edward Kmett
 -- License     :  BSD-style (see the file LICENSE)
 --
--- Maintainer  :  Edward Kmett <ekmett@gmail.com>
+-- Maintainer  : "Samuel Gélineau" <gelisam@gmail.com>,
+--               "Oleg Grenrus" <oleg.grenrus@iki.fi>,
+--               "Ryan Scott" <ryan.gl.scott@gmail.com>
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
