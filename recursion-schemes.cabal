@@ -41,6 +41,7 @@ library
     StandaloneDeriving
     UndecidableInstances
 
+  hs-source-dirs: src
   include-dirs: include
   -- includes: recursion-schemes-common.h
 
