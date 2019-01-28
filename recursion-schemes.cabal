@@ -12,11 +12,8 @@ stability:     provisional
 homepage:      http://github.com/ekmett/recursion-schemes/
 bug-reports:   http://github.com/ekmett/recursion-schemes/issues
 copyright:     Copyright (C) 2008-2015 Edward A. Kmett
-synopsis:      Generalized bananas, lenses and barbed wire
-description:
-  Recursion operators, see
-  "Generalized bananas, lenses and barbed wire"
-  by Erik Meijer, Maarten Fokkinga and Ross Paterson.
+synopsis:      Representing common recursion patterns as higher-order functions
+description:   Using higher-order functions instead of general recursion makes your code clearer, faster, and safer. See README for details.
 
 tested-with:   GHC==7.4.2, GHC==7.6.3, GHC==7.8.4, GHC==7.10.3, GHC==8.0.2, GHC==8.2.2, GHC==8.4.4, GHC==8.6.3
 
