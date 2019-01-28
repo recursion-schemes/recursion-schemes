@@ -29,3 +29,9 @@ Using recursion schemes can help you to avoid accidentally writing infinite or n
 Many recursion schemes can be implemented in terms of each other. So if you notice that the non-recursive functions you provide themselves seem to share a common pattern, you might be accidentally reimplementing an existing recursion scheme which already has those common parts builtin; or maybe you have stumbled upon a new recursion scheme which does not yet have a name, and which you may want to implement yourself.
 
 One way to implement such a custom recursion scheme is to combine the features of existing recursion schemes. For example, a "paramorphism" gives the non-recursive function access to the original sub-trees, a "zygomorphism" gives that function access to auxiliary results computed from those sub-trees, and so the combined "zygomorphic paramorphism" gives that function access to both the original sub-trees and the auxiliary results. In order to construct such combinations, most of our recursion schemes come in a generalized variant, e.g. `gzygo`, and in a "distributive law transformer" variant, e.g. `distZygoT`. Just like monad transformers, distributive law transformers can be combined into stacks, and like monad transformers, the order in which you combine the layers determines how the layers interact with each other. Apply a generalized recursion scheme to a stack of distributive laws in order to obtain a recursion scheme which has both the features of the generalized recursion scheme and those of the distributive laws.
+
+## Contributing
+
+Contributions and bug reports are welcome!
+
+Please feel free to contact us by opening a github issue or by hopping onto the #haskell IRC channel on irc.freenode.net.
