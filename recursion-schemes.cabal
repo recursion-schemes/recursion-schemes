@@ -5,7 +5,9 @@ license:       BSD3
 cabal-version: >= 1.8
 license-file:  LICENSE
 author:        Edward A. Kmett
-maintainer:    Edward A. Kmett <ekmett@gmail.com>
+maintainer:    "Samuel Gélineau" <gelisam@gmail.com>,
+               "Oleg Grenrus" <oleg.grenrus@iki.fi>,
+               "Ryan Scott" <ryan.gl.scott@gmail.com>
 stability:     provisional
 homepage:      http://github.com/ekmett/recursion-schemes/
 bug-reports:   http://github.com/ekmett/recursion-schemes/issues
