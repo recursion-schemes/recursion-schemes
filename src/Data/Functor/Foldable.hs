@@ -8,6 +8,7 @@
 #endif
 #if HAS_GENERIC
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE ScopedTypeVariables, DefaultSignatures, MultiParamTypeClasses, TypeOperators #-}
 #endif
 #endif
 
@@ -115,7 +116,7 @@ import Data.Data hiding (gunfold)
 import qualified Data.Data as Data
 #endif
 #if HAS_GENERIC
-import GHC.Generics (Generic)
+import GHC.Generics (Generic (..), M1 (..), K1 (..), (:+:) (..), (:*:) (..))
 #endif
 #if HAS_GENERIC1
 import GHC.Generics (Generic1)
@@ -143,6 +144,10 @@ type family Base t :: * -> *
 
 class Functor (Base t) => Recursive t where
   project :: t -> Base t t
+#ifdef HAS_GENERIC
+  default project :: (Generic t, Generic (Base t t), GCoerce (Rep t) (Rep (Base t t))) => t -> Base t t
+  project = to . gcoerce . from
+#endif
 
   cata :: (Base t a -> a) -- ^ a (Base t)-algebra
        -> t               -- ^ fixed point
@@ -182,6 +187,11 @@ distParaT t = distZygoT embed t
 
 class Functor (Base t) => Corecursive t where
   embed :: Base t t -> t
+#ifdef HAS_GENERIC
+  default embed :: (Generic t, Generic (Base t t), GCoerce (Rep (Base t t)) (Rep t)) => Base t t -> t
+  embed = to . gcoerce . from
+#endif
+
   ana
     :: (a -> Base t a) -- ^ a (Base t)-coalgebra
     -> a               -- ^ seed
@@ -816,3 +826,24 @@ _readListWith rp =
         [(x:xs,u) | (x,t) <- rp s, (xs,u) <- readl' t]
     readl' s = [([],t) | ("]",t) <- lex s] ++
         [(x:xs,v) | (",",t) <- lex s, (x,u) <- rp t, (xs,v) <- readl' u]
+
+-------------------------------------------------------------------------------
+-- GCoerce
+-------------------------------------------------------------------------------
+
+class GCoerce f g where
+    gcoerce :: f a -> g a
+
+instance GCoerce f g => GCoerce (M1 i c f) (M1 i c' g) where
+    gcoerce (M1 x) = M1 (gcoerce x)
+
+-- R changes to/from P with GHC-7.4.2 at least.
+instance GCoerce (K1 i c) (K1 j c) where
+    gcoerce = K1 . unK1
+
+instance (GCoerce f g, GCoerce f' g') => GCoerce (f :*: f') (g :*: g') where
+    gcoerce (x :*: y) = gcoerce x :*: gcoerce y
+
+instance (GCoerce f g, GCoerce f' g') => GCoerce (f :+: f') (g :+: g') where
+    gcoerce (L1 x) = L1 (gcoerce x)
+    gcoerce (R1 x) = R1 (gcoerce x)
