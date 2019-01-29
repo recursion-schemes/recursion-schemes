@@ -30,7 +30,8 @@ makeBaseFunctorWith (runIdentity $ return baseRules
     ) ''Expr2
 
 data Expr3 a
-    = Lit3 a
+    = Unit3
+    | Lit3 a
     | Add3 (Expr3 a) (Expr3 a)
     | OpA (Expr3 a) (Expr3 a) Int
     | OpB (Expr3 a) (Expr3 a) Char
@@ -41,7 +42,8 @@ data Expr3 a
   deriving (Show, Generic)
 
 data Expr3F a b
-    = Lit3F a
+    = Unit3F
+    | Lit3F a
     | Add3F b b
     | OpAF b b Int
     | OpBF b b Char
