@@ -815,21 +815,6 @@ cotransverse :: (Recursive s, Corecursive t, Functor f)
 cotransverse n = ana (n . fmap project)
 
 -------------------------------------------------------------------------------
--- Not exposed anywhere
--------------------------------------------------------------------------------
-
--- | Read a list (using square brackets and commas), given a function
--- for reading elements.
-_readListWith :: ReadS a -> ReadS [a]
-_readListWith rp =
-    readParen False (\r -> [pr | ("[",s) <- lex r, pr <- readl s])
-  where
-    readl s = [([],t) | ("]",t) <- lex s] ++
-        [(x:xs,u) | (x,t) <- rp s, (xs,u) <- readl' t]
-    readl' s = [([],t) | ("]",t) <- lex s] ++
-        [(x:xs,v) | (",",t) <- lex s, (x,u) <- rp t, (xs,v) <- readl' u]
-
--------------------------------------------------------------------------------
 -- GCoerce
 -------------------------------------------------------------------------------
 
