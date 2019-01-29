@@ -5,16 +5,15 @@ license:       BSD3
 cabal-version: >= 1.8
 license-file:  LICENSE
 author:        Edward A. Kmett
-maintainer:    Edward A. Kmett <ekmett@gmail.com>
+maintainer:    "Samuel Gélineau" <gelisam@gmail.com>,
+               "Oleg Grenrus" <oleg.grenrus@iki.fi>,
+               "Ryan Scott" <ryan.gl.scott@gmail.com>
 stability:     provisional
 homepage:      http://github.com/ekmett/recursion-schemes/
 bug-reports:   http://github.com/ekmett/recursion-schemes/issues
 copyright:     Copyright (C) 2008-2015 Edward A. Kmett
-synopsis:      Generalized bananas, lenses and barbed wire
-description:
-  Recursion operators, see
-  "Generalized bananas, lenses and barbed wire"
-  by Erik Meijer, Maarten Fokkinga and Ross Paterson.
+synopsis:      Representing common recursion patterns as higher-order functions
+description:   Many recursive functions share the same structure, e.g. pattern-match on the input and, depending on the data constructor, either recur on a smaller input or terminate the recursion with the base case. Another one: start with a seed value, use it to produce the first element of an infinite list, and recur on a modified seed in order to produce the rest of the list. Such a structure is called a recursion scheme. Using higher-order functions to implement those recursion schemes makes your code clearer, faster, and safer. See README for details.
 
 tested-with:   GHC==7.4.2, GHC==7.6.3, GHC==7.8.4, GHC==7.10.3, GHC==8.0.2, GHC==8.2.2, GHC==8.4.4, GHC==8.6.3
 
