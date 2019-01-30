@@ -118,7 +118,7 @@ import Data.Data hiding (gunfold)
 import qualified Data.Data as Data
 #endif
 #if HAS_GENERIC
-import GHC.Generics (Generic (..), M1 (..), K1 (..), (:+:) (..), (:*:) (..))
+import GHC.Generics (Generic (..), M1 (..), V1, U1, K1 (..), (:+:) (..), (:*:) (..))
 #endif
 #if HAS_GENERIC1
 import GHC.Generics (Generic1)
@@ -815,21 +815,6 @@ cotransverse :: (Recursive s, Corecursive t, Functor f)
 cotransverse n = ana (n . fmap project)
 
 -------------------------------------------------------------------------------
--- Not exposed anywhere
--------------------------------------------------------------------------------
-
--- | Read a list (using square brackets and commas), given a function
--- for reading elements.
-_readListWith :: ReadS a -> ReadS [a]
-_readListWith rp =
-    readParen False (\r -> [pr | ("[",s) <- lex r, pr <- readl s])
-  where
-    readl s = [([],t) | ("]",t) <- lex s] ++
-        [(x:xs,u) | (x,t) <- rp s, (xs,u) <- readl' t]
-    readl' s = [([],t) | ("]",t) <- lex s] ++
-        [(x:xs,v) | (",",t) <- lex s, (x,u) <- rp t, (xs,v) <- readl' u]
-
--------------------------------------------------------------------------------
 -- GCoerce
 -------------------------------------------------------------------------------
 
@@ -842,6 +827,12 @@ instance GCoerce f g => GCoerce (M1 i c f) (M1 i c' g) where
 -- R changes to/from P with GHC-7.4.2 at least.
 instance GCoerce (K1 i c) (K1 j c) where
     gcoerce = K1 . unK1
+
+instance GCoerce U1 U1 where
+    gcoerce = id
+
+instance GCoerce V1 V1 where
+    gcoerce = id
 
 instance (GCoerce f g, GCoerce f' g') => GCoerce (f :*: f') (g :*: g') where
     gcoerce (x :*: y) = gcoerce x :*: gcoerce y

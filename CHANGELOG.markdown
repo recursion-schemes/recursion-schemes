@@ -1,3 +1,7 @@
+## 5.1.1.1
+* Fix the `Generic`-based instances to also support data constructors with zero
+  arguments (and datatypes with zero constructors).
+
 ## 5.1.1
 
 * Add `cotransverse`
