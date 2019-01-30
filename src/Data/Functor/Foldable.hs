@@ -879,6 +879,15 @@ distGApoT g k = fmap ExceptT . k . fmap (distGApo g) . runExceptT
 -- iteration. Like a 'cata'@morphism@, a histomorphism folds some structure, but
 -- unlike a catamorphism (which only has access to the immediate recursive call)
 -- a histomorphism has access to all recursive calls.
+--
+-- An example of a histomorphism is to generate the nth term of the Fibonacci
+-- sequence. Recall that generating a Fibonacci number requires the precedeeing
+-- term, but also the term that preceeds that:
+--
+-- > fib :: Natural -> Natural
+-- > fib n = histo $ \case Nothing -> 0
+-- >                       Just (_ :< Nothing) -> 1
+-- >                       Just (n :< Just (m :< _)) -> n + m
 histo :: Recursive t => (Base t (Cofree (Base t) a) -> a) -> t -> a
 histo = gcata distHisto
 
