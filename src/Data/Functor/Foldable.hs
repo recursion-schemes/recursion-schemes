@@ -26,10 +26,14 @@
 ----------------------------------------------------------------------------
 module Data.Functor.Foldable
   (
+  -- $intro
+
   -- * Base functors for fixed points
+  -- $patternFunctors
     Base
   , ListF(..)
   -- * Fixed points
+  -- $ fixedPoints
   , Fix(..), unfix
   , Mu(..), hoistMu
   , Nu(..), hoistNu
@@ -142,27 +146,119 @@ import qualified Data.Functor.Base as NEF (NonEmptyF(..))
 -- >>> import Control.Monad (void)
 -- >>> import Data.Char (toUpper)
 
+-- | This type family encodes the relationship between a type @t@ and it's
+-- pattern functor. For example, for the list type
+--
+-- > data List a = Nil | Cons a (List a)
+--
+-- We have the corresponding pattern functor
+--
+-- > data ListF x a = Nil | Cons x a
+--
+-- In this case, @Base (List a) = ListF x@.
 type family Base t :: * -> *
 
+-- | The class of recursive data types.
+--
+-- A data type is recursive if it contains values of its own type in one or more
+-- of it's constructors.
+--
+-- As an example, we have the list type
+--
+-- > data List a = Nil | Cons a (List a)
+--
+-- This is recursive because the @Cons@ constructor mentions the very type it's
+-- defining (@List a@).
+--
+-- Note that the data type only needs to morally have this recursive
+-- relationship. As an example of a slightly more interesting @Recursive@
+-- instance, consider @Recursive Natural@. Here the pattern functor is @Maybe@,
+-- where the choice between @Nothing@ and @Just@ represent the Peano axioms "0
+-- is a natural number" and "For every natural number n, S(n) is a natural
+-- number."
 class Functor (Base t) => Recursive t where
+  -- | @project@ converts a value of type @t@ into an isomorphic value built by
+  -- @t@'s pattern functor.
+  --
+  -- If we have
+  --
+  -- > data List a = Nil | Cons a (List a)
+  -- > data ListF x a = Nil | Cons x a
+  --
+  -- Then @project \@(List a) :: List a -> ListF a (List a)@.
   project :: t -> Base t t
 #ifdef HAS_GENERIC
   default project :: (Generic t, Generic (Base t t), GCoerce (Rep t) (Rep (Base t t))) => t -> Base t t
   project = to . gcoerce . from
 #endif
 
+  -- | @cata@ is used to construct /catamorphisms/. A catamorphism on a type @T@
+  -- is a function @T -> U@ that destructs an object of type @T@ according to its
+  -- structure, calls itself recursively on any sub-components of type @T@, and
+  -- combines this recursive result with the remaining components of @T@ to form
+  -- @U@. Loosely speaking, catamorphisms are generalizations of the notion of
+  -- a fold.
+  --
+  -- The prefix "cata" comes from the Greek 'κατα-' meaning
+  -- "downward or according to". A useful mnemonic is to think of a catastrophe
+  -- destroying something.
+  --
+  -- As an example, consider the catamorphism that takes the length of a list.
+  --
+  -- > length :: List a -> Int
+  -- > length = cata $ \case Nil -> 0
+  -- >                       Cons _ n -> 1 + n
+  --
+  -- Consider the list @Cons 1 (Cons 2 Nil)@. When we use @length@, the recursive
+  -- part of the list is replaced with the length of that list. The given
+  -- function uses this recursive call to implement a function for the length of
+  -- the list - the length of an empty list is 0, and the length of an element
+  -- prepended to a list is the length of that list plus 1.
   cata :: (Base t a -> a) -- ^ a (Base t)-algebra
        -> t               -- ^ fixed point
        -> a               -- ^ result
   cata f = c where c = f . fmap c . project
 
+  -- | @para@ is used to construct /paramorphisms/, which correspond to
+  -- primitive recursive definitions. These recursive functions are similar to
+  -- catamorphisms, but where we have the result of a recursive call, we also
+  -- have the argument used to produce that result.
+  --
+  -- As an example of a paramorphism, Conor McBride provides this example on
+  -- Stack Overflow (https://stackoverflow.com/questions/13317242/what-are-paramorphisms).
+  --
+  -- > suffices :: [a] -> [[a]]
+  -- > suffices = para $ \case Nil -> []
+  -- >                         Cons _ ( xs, suffxs ) -> xs : suffxs
+  --
+  -- >>> suffices "suffix"
+  -- ["uffix","ffix","fix","ix","x",""]
+  --
+  -- To understand this result, consider breaking apart the string @"suffix"@
+  -- into its pattern functor, with the recursive call and argument:
+  --
+  -- > "suffix" = Cons 's' ( "uffix", f "uffix" )
+  --
+  -- Thus our @suffices@ function is really just returning all of the arguments
+  -- to the recursive call.
   para :: (Base t (t, a) -> a) -> t -> a
   para t = p where p x = t . fmap ((,) <*> p) $ project x
 
+  -- | TODO
   gpara :: (Corecursive t, Comonad w) => (forall b. Base t (w b) -> w (Base t b)) -> (Base t (EnvT t w a) -> a) -> t -> a
   gpara t = gzygo embed t
 
-  -- | Fokkinga's prepromorphism
+  -- | @prepro@ is used to construct /prepromorphisms/ - these are like
+  -- catamorphisms that have a preprocessing step. Jared Tobin provides a simple
+  -- example where the preprocessing step is to filter an input list.
+  --
+  -- > filterLT :: Num a => a -> ListF a x -> ListF a x
+  -- > filterLT _ Nil = Nil
+  -- > filterLT y (Cons x xs) | x < y     = Cons x xs
+  -- >                        | otherwise = Nil
+  --
+  -- >>> prepro (filterLT 10) sum [1, 2, 10, 3]
+  -- 6 -- 1 + 2 + 3, 10 was filtered out.
   prepro
     :: Corecursive t
     => (forall b. Base t b -> Base t b)
@@ -171,7 +267,7 @@ class Functor (Base t) => Recursive t where
     -> a
   prepro e f = c where c = f . fmap (c . hoist e) . project
 
-  --- | A generalized prepromorphism
+  --- | TODO A generalized prepromorphism
   gprepro
     :: (Corecursive t, Comonad w)
     => (forall b. Base t (w b) -> w (Base t b))
@@ -181,29 +277,69 @@ class Functor (Base t) => Recursive t where
     -> a
   gprepro k e f = extract . c where c = fmap f . k . fmap (duplicate . c . hoist e) . project
 
+-- | TODO
 distPara :: Corecursive t => Base t (t, a) -> (t, Base t a)
 distPara = distZygo embed
 
+-- | TODO
 distParaT :: (Corecursive t, Comonad w) => (forall b. Base t (w b) -> w (Base t b)) -> Base t (EnvT t w a) -> EnvT t w (Base t a)
 distParaT t = distZygoT embed t
 
+-- | The class of co-recursive data types.
+--
+-- A data type is co-recursive if it can be built up productively from its
+-- pattern functor.
+--
+-- As an example, we have the list type with its pattern functor:
+--
+-- > data List a = Nil | Cons a (List a)
+-- > data ListF a x = Nil | Cons a x
+--
+-- Thus List is Corecursive because we can build a List from independent pattern
+-- functors (as witnessed by 'embed').
 class Functor (Base t) => Corecursive t where
+  -- | Embed a pattern functor into the fixed-point type.
+  --
+  -- If we have
+  --
+  -- > data List a = Nil | Cons a (List a)
+  -- > data ListF x a = Nil | Cons x a
+  --
+  -- Then @embed \@(List a) :: ListF a (List a) -> List a@.
   embed :: Base t t -> t
 #ifdef HAS_GENERIC
   default embed :: (Generic t, Generic (Base t t), GCoerce (Rep (Base t t)) (Rep t)) => Base t t -> t
   embed = to . gcoerce . from
 #endif
 
+  -- | @ana@ is used to construct /anamorphisms/. An anamorphism on a type @T@
+  -- is a function @U -> T@ that destructs @U@ in some way into a number of
+  -- components. It recursively calls itself on components of type @U@, and
+  -- combines this recursive result with other components to form @T@. Loosely
+  -- speaking, anamorphisms are generalizations of the notion of an unfold.
+  --
+  -- The prefix "ana" comes from the Greek 'ana-' meaning "back" or "again".
+  --
+  -- As an example, consider the anamorphism that repeatedly applies a function
+  -- to a value and returns a list of results:
+  --
+  -- > iterate :: (a -> a) -> a -> List a
+  -- > iterate f = ana $ \x -> Cons x (f x)
+  --
+  -- Here we see that the anamorphism turns the seed value (initial point of
+  -- iteration) into a list containing that value, and recursively calls itself
+  -- with a new seed value - the result of one step of iteration.
   ana
     :: (a -> Base t a) -- ^ a (Base t)-coalgebra
     -> a               -- ^ seed
     -> t               -- ^ resulting fixed point
   ana g = a where a = embed . fmap a . g
 
+  -- | TODO
   apo :: (a -> Base t (Either t a)) -> a -> t
   apo g = a where a = embed . (fmap (either id a)) . g
 
-  -- | Fokkinga's postpromorphism
+  -- | TODO Fokkinga's postpromorphism
   postpro
     :: Recursive t
     => (forall b. Base t b -> Base t b) -- natural transformation
@@ -212,7 +348,7 @@ class Functor (Base t) => Corecursive t where
     -> t
   postpro e g = a where a = embed . fmap (hoist e . a) . g
 
-  -- | A generalized postpromorphism
+  -- | TODO A generalized postpromorphism
   gpostpro
     :: (Recursive t, Monad m)
     => (forall b. m (Base t b) -> Base t (m b)) -- distributive law
@@ -222,19 +358,53 @@ class Functor (Base t) => Corecursive t where
     -> t
   gpostpro k e g = a . return where a = embed . fmap (hoist e . a . join) . k . liftM g
 
+-- | A /hylomorphism/ is a combination of an anamorphism followed by a
+-- catamorphism. However, category theory tells us that we can fuse these
+-- recursive programs together, to avoid building the intermediate data
+-- structure (deforestation).
+--
+-- An example of a hylomorphism is generating the nth term of the Fibonacci
+-- sequence. First, we construct a tree in the shape of the Fibonacci series
+-- (with leaves corresponding to @fib 0@ and @fib 1@), and then fold these tree
+-- under summation:
+--
+-- > data Tree a = Leaf a | Branch (Tree a) (Tree a)
+--
+-- > data TreeF a x = Leaf a | Branch x x
+--
+-- > fib :: Int -> Int
+-- > fib = hylo sumTree buildTree where
+-- >   sumTree = \case Leaf n -> n
+-- >                   Cons x y -> x + y
+-- >   buildTree n | n == 0 = Leaf 0
+-- >               | n == 1 = Leaf 1
+-- >               | otherwise = Branch (n - 1) (n - 2)
 hylo :: Functor f => (f b -> b) -> (a -> f a) -> a -> b
 hylo f g = h where h = f . fmap h . g
 
+-- | As catamorphisms are the general notion of a fold, this synonym is provided
+-- if you want to use more familiar terminology.
+--
+-- > fold = cata
 fold :: Recursive t => (Base t a -> a) -> t -> a
 fold = cata
 
+-- | As anamorphisms are the general notion of an unfold, this synonym is
+-- provided if you want to use more familiar terminology.
+--
+-- > unfold = ana
 unfold :: Corecursive t => (a -> Base t a) -> a -> t
 unfold = ana
 
+-- | "Refolding" may be a slightly more intuitive name for the concept of a
+-- hylomorphism, so this synonym is provided for the cases where it may clarify
+-- code.
+--
+-- > refold = hylo
 refold :: Functor f => (f b -> b) -> (a -> f a) -> a -> b
 refold = hylo
 
--- | Base functor of @[]@.
+-- | Base functor of normal Haskell lists (@[]@).
 data ListF a b = Nil | Cons a b
   deriving (Eq,Ord,Show,Read,Typeable
 #if HAS_GENERIC
@@ -407,7 +577,7 @@ type instance Base (Either a b) = Const (Either a b)
 instance Recursive (Either a b) where project = Const
 instance Corecursive (Either a b) where embed = getConst
 
--- | A generalized catamorphism
+-- | TODO A generalized catamorphism
 gfold, gcata
   :: (Recursive t, Comonad w)
   => (forall b. Base t (w b) -> w (Base t b)) -- ^ a distributive law
@@ -418,10 +588,11 @@ gcata k g = g . extract . c where
   c = k . fmap (duplicate . fmap g . c) . project
 gfold k g t = gcata k g t
 
+-- | TODO
 distCata :: Functor f => f (Identity a) -> Identity (f a)
 distCata = Identity . fmap runIdentity
 
--- | A generalized anamorphism
+-- | TODO A generalized anamorphism
 gunfold, gana
   :: (Corecursive t, Monad m)
   => (forall b. m (Base t b) -> Base t (m b)) -- ^ a distributive law
@@ -432,10 +603,11 @@ gana k f = a . return . f where
   a = embed . fmap (a . liftM f . join) . k
 gunfold k f t = gana k f t
 
+-- | TODO
 distAna :: Functor f => Identity (f a) -> f (Identity a)
 distAna = fmap Identity . runIdentity
 
--- | A generalized hylomorphism
+-- | TODO A generalized hylomorphism
 grefold, ghylo
   :: (Comonad w, Functor f, Monad m)
   => (forall c. f (w c) -> w (f c))
@@ -448,16 +620,31 @@ ghylo w m f g = extract . h . return where
   h = fmap f . w . fmap (duplicate . h . join) . m . liftM g
 grefold w m f g a = ghylo w m f g a
 
+-- | A /futumorphism/ is an 'ana'@morphism@ that builds /at least/ one further
+-- recursive call per step.
+--
+-- For examples of futumorphisms, some suggested introductory material can be
+-- found online:
+--
+-- * Patrick Thomson's blog post
+--   <https://blog.sumtypeofway.com/recursion-schemes-part-iv-time-is-of-the-essence/ Recursion Schemes, Part IV: Time is of the Essence>
+--   shows how futumorphisms can be used to grow plants.
+-- * Jared Tobin's blog post
+--   <https://jtobin.io/time-traveling-recursion Time Travelling Recursion Schemes>
+--   shows a few simple examples of futumorphisms on lists.
 futu :: Corecursive t => (a -> Base t (Free (Base t) a)) -> a -> t
 futu = gana distFutu
 
+-- | TODO
 gfutu :: (Corecursive t, Functor m, Monad m) => (forall b. m (Base t b) -> Base t (m b)) -> (a -> Base t (FreeT (Base t) m a)) -> a -> t
 gfutu g = gana (distGFutu g)
 
+-- | TODO
 distFutu :: Functor f => Free f (f a) -> f (Free f a)
 distFutu (Pure fx) = Pure <$> fx
 distFutu (Free ff) = Free . distFutu <$> ff
 
+-- | TODO
 distGFutu :: (Functor f, Functor h) => (forall b. h (f b) -> f (h b)) -> FreeT f h (f a) -> f (FreeT f h a)
 distGFutu k = d where
   d = fmap FreeT . k . fmap d' . runFreeT
@@ -468,8 +655,10 @@ distGFutu k = d where
 -- Fix
 -------------------------------------------------------------------------------
 
+-- | TODO
 newtype Fix f = Fix (f (Fix f))
 
+-- | TODO
 unfix :: Fix f -> f (Fix f)
 unfix (Fix f) = f
 
@@ -530,16 +719,20 @@ instance Functor f => Recursive (Fix f) where
 instance Functor f => Corecursive (Fix f) where
   embed = Fix
 
+-- | TODO
 hoist :: (Recursive s, Corecursive t)
       => (forall a. Base s a -> Base t a) -> s -> t
 hoist n = cata (embed . n)
 
+-- | TODO
 refix :: (Recursive s, Corecursive t, Base s ~ Base t) => s -> t
 refix = cata embed
 
+-- | TODO
 toFix :: Recursive t => t -> Fix (Base t)
 toFix = refix
 
+-- | TODO
 fromFix :: Corecursive t => Fix (Base t) -> t
 fromFix = refix
 
@@ -556,6 +749,7 @@ lambek = cata (fmap embed)
 colambek :: (Recursive t, Corecursive t) => (Base t t -> t)
 colambek = ana (fmap project)
 
+-- | TODO
 newtype Mu f = Mu (forall a. (f a -> a) -> a)
 type instance Base (Mu f) = f
 instance Functor f => Recursive (Mu f) where
@@ -599,6 +793,7 @@ instance Functor f => Corecursive (CMFC.F f a) where
   embed (CMTF.Free fr) = CMFC.F $ \p f -> f $ fmap (cmfcCata p f) fr
 
 
+-- | TODO
 data Nu f where Nu :: (a -> f a) -> a -> Nu f
 type instance Base (Nu f) = f
 instance Functor f => Corecursive (Nu f) where
@@ -624,20 +819,23 @@ instance (Functor f, Read1 f) => Read (Nu f) where
     fromFix <$> step readPrec
 #endif
 
--- | A specialized, faster version of 'hoist' for 'Nu'.
+-- | TOO A specialized, faster version of 'hoist' for 'Nu'.
 hoistNu :: (forall a. f a -> g a) -> Nu f -> Nu g
 hoistNu n (Nu next seed) = Nu (n . next) seed
 
 
+-- | TODO
 zygo :: Recursive t => (Base t b -> b) -> (Base t (b, a) -> a) -> t -> a
 zygo f = gfold (distZygo f)
 
+-- | TODO
 distZygo
   :: Functor f
   => (f b -> b)             -- An f-algebra
   -> (f (b, a) -> (b, f a)) -- ^ A distributive for semi-mutual recursion
 distZygo g m = (g (fmap fst m), fmap snd m)
 
+-- | TODO
 gzygo
   :: (Recursive t, Comonad w)
   => (Base t b -> b)
@@ -647,6 +845,7 @@ gzygo
   -> a
 gzygo f w = gfold (distZygoT f w)
 
+-- | TODO
 distZygoT
   :: (Functor f, Comonad w)
   => (f b -> b)                        -- An f-w-algebra to use for semi-mutual recursion
@@ -655,15 +854,19 @@ distZygoT
 distZygoT g k fe = EnvT (g (getEnv <$> fe)) (k (lower <$> fe))
   where getEnv (EnvT e _) = e
 
+-- | TODO
 gapo :: Corecursive t => (b -> Base t b) -> (a -> Base t (Either b a)) -> a -> t
 gapo g = gunfold (distGApo g)
 
+-- | TODO
 distApo :: Recursive t => Either t (Base t a) -> Base t (Either t a)
 distApo = distGApo project
 
+-- | TODO
 distGApo :: Functor f => (b -> f b) -> Either b (f a) -> f (Either b a)
 distGApo f = either (fmap Left . f) (fmap Right)
 
+-- | TODO
 distGApoT
   :: (Functor f, Functor m)
   => (b -> f b)
@@ -672,22 +875,30 @@ distGApoT
   -> f (ExceptT b m a)
 distGApoT g k = fmap ExceptT . k . fmap (distGApo g) . runExceptT
 
--- | Course-of-value iteration
+-- | /Histomorphisms/ are recursive functions that use "course-of-value"
+-- iteration. Like a 'cata'@morphism@, a histomorphism folds some structure, but
+-- unlike a catamorphism (which only has access to the immediate recursive call)
+-- a histomorphism has access to all recursive calls.
 histo :: Recursive t => (Base t (Cofree (Base t) a) -> a) -> t -> a
 histo = gcata distHisto
 
+-- | TODO
 ghisto :: (Recursive t, Comonad w) => (forall b. Base t (w b) -> w (Base t b)) -> (Base t (CofreeT (Base t) w a) -> a) -> t -> a
 ghisto g = gcata (distGHisto g)
 
+-- | TODO
 distHisto :: Functor f => f (Cofree f a) -> Cofree f (f a)
 distHisto fc = fmap extract fc :< fmap (distHisto . Cofree.unwrap) fc
 
+-- | TODO
 distGHisto :: (Functor f, Functor h) => (forall b. f (h b) -> h (f b)) -> f (CofreeT f h a) -> CofreeT f h (f a)
 distGHisto k = d where d = CofreeT . fmap (\fc -> fmap CCTC.headF fc CCTC.:< fmap (d . CCTC.tailF) fc) . k . fmap runCofreeT
 
+-- | TODO
 chrono :: Functor f => (f (Cofree f b) -> b) -> (a -> f (Free f a)) -> (a -> b)
 chrono = ghylo distHisto distFutu
 
+-- | TODO
 gchrono :: (Functor f, Functor w, Functor m, Comonad w, Monad m) =>
            (forall c. f (w c) -> w (f c)) ->
            (forall c. m (f c) -> f (m c)) ->
@@ -695,23 +906,23 @@ gchrono :: (Functor f, Functor w, Functor m, Comonad w, Monad m) =>
            (a -> b)
 gchrono w m = ghylo (distGHisto w) (distGFutu m)
 
--- | Mendler-style iteration
+-- | TODO Mendler-style iteration
 mcata :: (forall y. (y -> c) -> f y -> c) -> Fix f -> c
 mcata psi = psi (mcata psi) . unfix
 
--- | Mendler-style course-of-value iteration
+-- | TODO Mendler-style course-of-value iteration
 mhisto :: (forall y. (y -> c) -> (y -> f y) -> f y -> c) -> Fix f -> c
 mhisto psi = psi (mhisto psi) unfix . unfix
 
--- | Elgot algebras
+-- | TODO Elgot algebras
 elgot :: Functor f => (f a -> a) -> (b -> Either a (f b)) -> b -> a
 elgot phi psi = h where h = (id ||| phi . fmap h) . psi
 
--- | Elgot coalgebras: <http://comonad.com/reader/2008/elgot-coalgebras/>
+-- | TODO Elgot coalgebras: <http://comonad.com/reader/2008/elgot-coalgebras/>
 coelgot :: Functor f => ((a, f b) -> b) -> (a -> f a) -> a -> b
 coelgot phi psi = h where h = phi . (id &&& fmap h . psi)
 
--- | Zygohistomorphic prepromorphisms:
+-- | TODO Zygohistomorphic prepromorphisms:
 --
 -- A corrected and modernized version of <http://www.haskell.org/haskellwiki/Zygohistomorphic_prepromorphisms>
 zygoHistoPrepro
@@ -849,3 +1060,12 @@ instance (GCoerce f g, GCoerce f' g') => GCoerce (f :*: f') (g :*: g') where
 instance (GCoerce f g, GCoerce f' g') => GCoerce (f :+: f') (g :+: g') where
     gcoerce (L1 x) = L1 (gcoerce x)
     gcoerce (R1 x) = R1 (gcoerce x)
+
+-- $intro
+-- TODO
+
+-- $patternFunctors
+-- TODO
+
+-- $fixedPoints
+-- TODO
