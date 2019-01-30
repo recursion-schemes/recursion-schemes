@@ -17,8 +17,14 @@ description:   Many recursive functions share the same structure, e.g. pattern-m
 
 tested-with:   GHC==7.4.2, GHC==7.6.3, GHC==7.8.4, GHC==7.10.3, GHC==8.0.2, GHC==8.2.2, GHC==8.4.4, GHC==8.6.3
 
-build-type:    Simple
+build-type:    Custom
 extra-source-files: .travis.yml CHANGELOG.markdown .gitignore README.markdown include/recursion-schemes-common.h
+custom-setup
+  setup-depends:
+    Cabal >= 1.10 && <2.5,
+    base  >= 4.5 && <5,
+    cabal-doctest >= 1 && <1.1,
+    filepath
 
 source-repository head
   type: git
@@ -103,3 +109,9 @@ test-suite Expr
     transformers     >= 0.2     && < 1
   if impl(ghc < 7.5)
     build-depends: ghc-prim
+
+test-suite doctests
+  type:          exitcode-stdio-1.0
+  ghc-options:   -threaded
+  main-is:       doctests.hs
+  build-depends: base, doctest >= 0.8, comonad, free

@@ -178,14 +178,17 @@ type family Base t :: * -> *
 -- number."
 class Functor (Base t) => Recursive t where
   -- | @project@ converts a value of type @t@ into an isomorphic value built by
-  -- @t@'s pattern functor.
+  -- @t@'s pattern functor. This witnesses a single recursive "step".
   --
   -- If we have
   --
-  -- > data List a = Nil | Cons a (List a)
   -- > data ListF x a = Nil | Cons x a
+  -- > type instance Base [a] = ListF a
   --
-  -- Then @project \@(List a) :: List a -> ListF a (List a)@.
+  -- Then @project \@[a] :: [a] -> ListF a [a]@.
+  --
+  -- >>> project [1,2,3]
+  -- Cons 1 [2,3]
   project :: t -> Base t t
 #ifdef HAS_GENERIC
   default project :: (Generic t, Generic (Base t t), GCoerce (Rep t) (Rep (Base t t))) => t -> Base t t
@@ -205,15 +208,21 @@ class Functor (Base t) => Recursive t where
   --
   -- As an example, consider the catamorphism that takes the length of a list.
   --
-  -- > length :: List a -> Int
-  -- > length = cata $ \case Nil -> 0
-  -- >                       Cons _ n -> 1 + n
+  -- >>> :set -XLambdaCase
+  -- >>> :{
+  -- length :: [a] -> Int
+  -- length = cata $ \case Nil -> 0
+  --                       Cons _ n -> 1 + n
+  -- :}
   --
-  -- Consider the list @Cons 1 (Cons 2 Nil)@. When we use @length@, the recursive
-  -- part of the list is replaced with the length of that list. The given
-  -- function uses this recursive call to implement a function for the length of
-  -- the list - the length of an empty list is 0, and the length of an element
-  -- prepended to a list is the length of that list plus 1.
+  -- Consider the list @1 : 2 : []@. When we use @length@, for any list cons
+  -- constructor, the tail of list is replaced with the length of that list. The
+  -- given function uses this recursive call to implement a function for the
+  -- length of the list - the length of an empty list is 0, and the length of an
+  -- element prepended to a list is the length of that list plus 1.
+  --
+  -- >>> length [1,2]
+  -- 2 
   cata :: (Base t a -> a) -- ^ a (Base t)-algebra
        -> t               -- ^ fixed point
        -> a               -- ^ result
@@ -227,9 +236,12 @@ class Functor (Base t) => Recursive t where
   -- As an example of a paramorphism, Conor McBride provides this example on
   -- Stack Overflow (https://stackoverflow.com/questions/13317242/what-are-paramorphisms).
   --
-  -- > suffices :: [a] -> [[a]]
-  -- > suffices = para $ \case Nil -> []
-  -- >                         Cons _ ( xs, suffxs ) -> xs : suffxs
+  -- >>> :set -XLambdaCase
+  -- >>> :{
+  -- suffices :: [a] -> [[a]]
+  -- suffices = para $ \case Nil -> []
+  --                         Cons _ ( xs, suffxs ) -> xs : suffxs
+  -- :}
   --
   -- >>> suffices "suffix"
   -- ["uffix","ffix","fix","ix","x",""]
@@ -250,15 +262,27 @@ class Functor (Base t) => Recursive t where
 
   -- | @prepro@ is used to construct /prepromorphisms/ - these are like
   -- catamorphisms that have a preprocessing step. Jared Tobin provides a simple
-  -- example where the preprocessing step is to filter an input list.
+  -- example where the preprocessing step is to take only "small" elements of
+  -- a list.
   --
-  -- > filterLT :: Num a => a -> ListF a x -> ListF a x
-  -- > filterLT _ Nil = Nil
-  -- > filterLT y (Cons x xs) | x < y     = Cons x xs
-  -- >                        | otherwise = Nil
+  -- >>> :set -XLambdaCase
+  -- >>> :{
+  -- filterLT :: (Num a, Ord a) => a -> ListF a x -> ListF a x
+  -- filterLT _ Nil = Nil
+  -- filterLT y (Cons x xs) | x < y     = Cons x xs
+  --                        | otherwise = Nil
+  -- :}
   --
-  -- >>> prepro (filterLT 10) sum [1, 2, 10, 3]
-  -- 6 -- 1 + 2 + 3, 10 was filtered out.
+  -- >>> :{
+  -- prepro
+  --   (filterLT 10)
+  --   (\case Nil -> 0
+  --          Cons x y -> x + y)
+  --   [1, 2, 10, 3]
+  -- :}
+  -- 3
+  --
+  -- (@3 = 1 + 2@, when the @10@ was encountered our recursion was terminated.)
   prepro
     :: Corecursive t
     => (forall b. Base t b -> Base t b)
@@ -302,10 +326,13 @@ class Functor (Base t) => Corecursive t where
   --
   -- If we have
   --
-  -- > data List a = Nil | Cons a (List a)
   -- > data ListF x a = Nil | Cons x a
+  -- > type instance Base [a] = ListF a
   --
-  -- Then @embed \@(List a) :: ListF a (List a) -> List a@.
+  -- Then @embed \@[a] :: ListF a [a] -> [a]@.
+  --
+  -- >>> embed (Cons 1 [2, 3])
+  -- [1,2,3]
   embed :: Base t t -> t
 #ifdef HAS_GENERIC
   default embed :: (Generic t, Generic (Base t t), GCoerce (Rep (Base t t)) (Rep t)) => Base t t -> t
@@ -323,12 +350,17 @@ class Functor (Base t) => Corecursive t where
   -- As an example, consider the anamorphism that repeatedly applies a function
   -- to a value and returns a list of results:
   --
-  -- > iterate :: (a -> a) -> a -> List a
-  -- > iterate f = ana $ \x -> Cons x (f x)
+  -- >>> :{
+  -- iterate :: (a -> a) -> a -> [a]
+  -- iterate f = ana $ \x -> Cons x (f x)
+  -- :}
   --
   -- Here we see that the anamorphism turns the seed value (initial point of
   -- iteration) into a list containing that value, and recursively calls itself
   -- with a new seed value - the result of one step of iteration.
+  --
+  -- >>> take 5 (iterate (*2) 1)
+  -- [1,2,4,8,16]
   ana
     :: (a -> Base t a) -- ^ a (Base t)-coalgebra
     -> a               -- ^ seed
@@ -368,17 +400,24 @@ class Functor (Base t) => Corecursive t where
 -- (with leaves corresponding to @fib 0@ and @fib 1@), and then fold these tree
 -- under summation:
 --
--- > data Tree a = Leaf a | Branch (Tree a) (Tree a)
+-- >>> :set -XDeriveFunctor
+-- >>> :{
+-- data Tree a x = Leaf a | Branch x x deriving (Functor)
+-- :}
 --
--- > data TreeF a x = Leaf a | Branch x x
+-- >>> :set -XLambdaCase
+-- >>> :{
+-- fib :: Int -> Int
+-- fib = hylo sumTree buildTree where
+--   sumTree = \case Leaf n -> n
+--                   Branch x y -> x + y
+--   buildTree n | n == 0 = Leaf 0
+--               | n == 1 = Leaf 1
+--               | otherwise = Branch (n - 1) (n - 2)
+-- :}
 --
--- > fib :: Int -> Int
--- > fib = hylo sumTree buildTree where
--- >   sumTree = \case Leaf n -> n
--- >                   Cons x y -> x + y
--- >   buildTree n | n == 0 = Leaf 0
--- >               | n == 1 = Leaf 1
--- >               | otherwise = Branch (n - 1) (n - 2)
+-- >>> fib 5
+-- 5
 hylo :: Functor f => (f b -> b) -> (a -> f a) -> a -> b
 hylo f g = h where h = f . fmap h . g
 
@@ -884,10 +923,16 @@ distGApoT g k = fmap ExceptT . k . fmap (distGApo g) . runExceptT
 -- sequence. Recall that generating a Fibonacci number requires the precedeeing
 -- term, but also the term that preceeds that:
 --
--- > fib :: Natural -> Natural
--- > fib n = histo $ \case Nothing -> 0
--- >                       Just (_ :< Nothing) -> 1
--- >                       Just (n :< Just (m :< _)) -> n + m
+-- >>> :set -XLambdaCase
+-- >>> :{
+-- fib :: Natural -> Natural
+-- fib = histo $ \case Nothing -> 0
+--                     Just (_ :< Nothing) -> 1
+--                     Just (n :< Just (m :< _)) -> n + m
+-- :}
+--
+-- >>> fib 5
+-- 5
 histo :: Recursive t => (Base t (Cofree (Base t) a) -> a) -> t -> a
 histo = gcata distHisto
 
