@@ -1,6 +1,10 @@
-## 5.1.1.1
-* Fix the `Generic`-based instances to also support data constructors with zero
+## 5.1.2
+* Make the `Generic`-based instances to also support data constructors with zero
   arguments (and datatypes with zero constructors).
+
+## 5.1.1.1
+
+* Invalid release
 
 ## 5.1.1
 
