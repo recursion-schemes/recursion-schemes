@@ -139,6 +139,7 @@ import           Data.Functor.Base hiding (head, tail)
 import qualified Data.Functor.Base as NEF (NonEmptyF(..))
 
 -- $setup
+-- >>> :set -XDeriveFunctor
 -- >>> import Control.Monad (void)
 -- >>> import Data.Char (toUpper)
 
@@ -791,15 +792,17 @@ transverse n = cata (fmap embed . n)
 -- :}
 -- "FoObAr"
 --
--- We can implement `zipWith`
+-- We can implement a variant of `zipWith`
+--
+-- >>> data Pair a = Pair a a deriving Functor
 --
 -- >>> :{
--- let zipWith' :: (a -> b -> c) -> [a] -> [b] -> [c]
---     zipWith' f = curry $ cotransverse $ \(xs, base) -> case (project xs, base) of
---       (Nil,      _)        -> Nil
---       (_,        Nil)      -> Nil
---       (Cons x a, Cons y b) -> Cons (f x y) (a, b)
--- :}
+-- let zipWith' :: (a -> a -> b) -> [a] -> [a] -> [b]
+--     zipWith' f xs ys = cotransverse g (Pair xs ys) where
+--       g (Pair Nil        _)          = Nil
+--       g (Pair _          Nil)        = Nil
+--       g (Pair (Cons x a) (Cons y b)) = Cons (f x y) (Pair a b)
+--     :}
 --
 -- >>> zipWith' (*) [1,2,3] [4,5,6]
 -- [4,10,18]
