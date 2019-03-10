@@ -3,7 +3,7 @@
 #endif
 
 #ifndef MIN_VERSION_transformers
-#define MIN_VERSION_tarnsformers(x,y,z) 1
+#define MIN_VERSION_transformers(x,y,z) 1
 #endif
 
 #ifndef MIN_VERSION_transformers_compat
