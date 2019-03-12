@@ -1,0 +1,6 @@
+ghc-head:               True
+no-tests-no-benchmarks: False
+unconstrained:          False
+doctest:                True
+doctest-options:        -DCURRENT_PACKAGE_KEY='"recursion-schemes"'
+irc-channels:           irc.freenode.org#haskell-lens
