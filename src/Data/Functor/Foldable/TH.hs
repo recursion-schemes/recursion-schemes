@@ -121,14 +121,18 @@ toFName = mkName . f . nameBase
 
 makePrimForDI :: BaseRules -> DatatypeInfo -> DecsQ
 makePrimForDI rules
-  (DatatypeInfo { datatypeName    = tyName
-                , datatypeVars    = vars
-                , datatypeCons    = cons
-                , datatypeVariant = variant }) = do
+  (DatatypeInfo { datatypeName      = tyName
+#if MIN_VERSION_th_abstraction(0,3,0)
+                , datatypeInstTypes = instTys
+#else
+                , datatypeVars      = instTys
+#endif
+                , datatypeCons      = cons
+                , datatypeVariant   = variant }) = do
     when isDataFamInstance $
       fail "makeBaseFunctor: Data families are currently not supported."
     makePrimForDI' rules (variant == Newtype) tyName
-                   (map toTyVarBndr vars) cons
+                   (map toTyVarBndr instTys) cons
   where
     isDataFamInstance = case variant of
                           DataInstance    -> True
@@ -194,11 +198,11 @@ makePrimForDI' rules isNewtype tyName vars cons = do
 #endif
 
     -- type instance Base
-#if MIN_VERSION_template_haskell(2,9,0)
-    let baseDec = TySynInstD baseTypeName (TySynEqn [s] $ conAppsT tyNameF vars')
-#else
-    let baseDec = TySynInstD baseTypeName [s] $ conAppsT tyNameF vars'
+    baseDec <- tySynInstDCompat baseTypeName
+#if MIN_VERSION_th_abstraction(0,3,0)
+                                Nothing
 #endif
+                                [pure s] (pure $ conAppsT tyNameF vars')
 
     -- instance Recursive
     projDec <- FunD projectValName <$> mkMorphism id (_baseRulesCon rules) cons'
