@@ -445,7 +445,7 @@ grefold, ghylo
   -> (a -> f (m a))
   -> a
   -> b
-ghylo w m f g = extract . h . return where
+ghylo w m f g = f . fmap h . g where
   h = fmap f . w . fmap (duplicate . h . join) . m . liftM g
 grefold w m f g a = ghylo w m f g a
 
