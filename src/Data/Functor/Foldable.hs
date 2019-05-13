@@ -446,7 +446,7 @@ grefold, ghylo
   -> a
   -> b
 ghylo w m f g = f . fmap (hylo alg coalg) . g where
-  coalg = fmap join . m . fmap g
+  coalg = fmap join . m . liftM g
   alg   = fmap f . w . fmap duplicate
 grefold w m f g a = ghylo w m f g a
 
