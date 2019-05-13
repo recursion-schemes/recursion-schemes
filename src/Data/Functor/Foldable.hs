@@ -445,8 +445,9 @@ grefold, ghylo
   -> (a -> f (m a))
   -> a
   -> b
-ghylo w m f g = f . fmap h . g where
-  h = fmap f . w . fmap (duplicate . h . join) . m . liftM g
+ghylo w m f g = f . fmap (hylo alg coalg) . g where
+  coalg = fmap join . m . fmap g
+  alg   = fmap f . w . fmap duplicate
 grefold w m f g a = ghylo w m f g a
 
 futu :: Corecursive t => (a -> Base t (Free (Base t) a)) -> a -> t
