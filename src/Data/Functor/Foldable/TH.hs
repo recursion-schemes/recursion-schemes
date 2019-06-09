@@ -122,11 +122,7 @@ toFName = mkName . f . nameBase
 makePrimForDI :: BaseRules -> DatatypeInfo -> DecsQ
 makePrimForDI rules
   (DatatypeInfo { datatypeName      = tyName
-#if MIN_VERSION_th_abstraction(0,3,0)
                 , datatypeInstTypes = instTys
-#else
-                , datatypeVars      = instTys
-#endif
                 , datatypeCons      = cons
                 , datatypeVariant   = variant }) = do
     when isDataFamInstance $
@@ -198,10 +194,7 @@ makePrimForDI' rules isNewtype tyName vars cons = do
 #endif
 
     -- type instance Base
-    baseDec <- tySynInstDCompat baseTypeName
-#if MIN_VERSION_th_abstraction(0,3,0)
-                                Nothing
-#endif
+    baseDec <- tySynInstDCompat baseTypeName Nothing
                                 [pure s] (pure $ conAppsT tyNameF vars')
 
     -- instance Recursive
