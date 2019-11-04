@@ -29,6 +29,7 @@ module Data.Functor.Foldable
   -- * Base functors for fixed points
     Base
   , ListF(..)
+  , TreeF(..)
   -- * Fixed points
   , Fix(..), unfix
   , Mu(..), hoistMu
