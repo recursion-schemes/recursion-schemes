@@ -74,13 +74,6 @@ cons x xs = L (Just (x, xs))
 nil :: L a
 nil = L Nothing
 
--- Test #33
-data Tree a = Node {rootLabel :: a, subForest :: Forest a}
-  deriving (Show)
-type Forest a = [Tree a]
-
-makeBaseFunctor ''Tree
-
 main :: IO ()
 main = do
     let expr2 = ana divCoalg 55 :: Expr Int
