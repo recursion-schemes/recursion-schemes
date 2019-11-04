@@ -101,6 +101,7 @@ test-suite Expr
     HUnit <1.7,
     recursion-schemes,
     template-haskell,
-    transformers     >= 0.2     && < 1
+    transformers     >= 0.2     && < 1,
+    containers
   if impl(ghc < 7.5)
     build-depends: ghc-prim
