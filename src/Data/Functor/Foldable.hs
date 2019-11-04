@@ -109,6 +109,7 @@ import Data.Function (on)
 import Data.Functor.Classes
 import Data.Functor.Compose (Compose(..))
 import Data.List.NonEmpty(NonEmpty((:|)), nonEmpty, toList)
+import Data.Tree (Tree(Node))
 import Text.Read
 import Text.Show
 #ifdef __GLASGOW_HASKELL__
@@ -338,6 +339,28 @@ instance Corecursive [a] where
     Cons x (Left xs) -> x : xs
     Cons x (Right b) -> x : apo f b
     Nil -> []
+
+data TreeF a b = NodeF a [b]
+  deriving (Eq,Ord,Show,Read,Typeable
+#if HAS_GENERIC
+          , Generic
+#endif
+#if HAS_GENERIC1
+          , Generic1
+#endif
+          )
+
+instance Functor (TreeF a) where
+  fmap _ (NodeF x []) = NodeF x []
+  fmap f (NodeF x xs) = NodeF x (fmap f xs)
+
+instance Recursive (Tree a) where
+  project (Node n ns) = NodeF n ns
+
+instance Corecursive (Tree a) where
+  embed (NodeF n ns) = Node n ns
+
+type instance Base (Tree a) = TreeF a
 
 type instance Base (NonEmpty a) = NonEmptyF a
 instance Recursive (NonEmpty a) where
