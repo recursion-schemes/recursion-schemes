@@ -10,6 +10,7 @@ import GHC.Generics (Generic)
 import Data.List (foldl')
 import Test.HUnit
 import Data.Functor.Identity
+import Data.Tree
 
 data Expr a
     = Lit a
