@@ -355,6 +355,26 @@ instance Functor (TreeF a) where
   fmap _ (NodeF x []) = NodeF x []
   fmap f (NodeF x xs) = NodeF x (fmap f xs)
 
+instance F.Foldable (TreeF a) where
+  foldMap _ (NodeF _ []) = Data.Monoid.mempty
+  foldMap f (NodeF _ xs) = foldMap f xs
+
+instance T.Traversable (TreeF a) where
+  traverse _ (NodeF x []) = pure (NodeF x [])
+  traverse f (NodeF x xs) = NodeF x <$> traverse f xs
+
+instance Bi.Bifunctor TreeF where
+  bimap f _ (NodeF x []) = NodeF (f x) []
+  bimap f g (NodeF x xs) = NodeF (f x) (g <$> xs)
+
+instance Bi.Bifoldable TreeF where
+  bifoldMap f _ (NodeF x []) = f x
+  bifoldMap f g (NodeF x xs) = mappend (f x) (g `foldMap` xs)
+
+instance Bi.Bitraversable TreeF where
+  bitraverse f _ (NodeF x []) = NodeF <$> f x <*> pure []
+  bitraverse f g (NodeF x xs) = NodeF <$> f x <*> g `traverse` xs
+
 instance Recursive (Tree a) where
   project (Node n ns) = NodeF n ns
 
