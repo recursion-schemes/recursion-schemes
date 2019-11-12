@@ -351,6 +351,41 @@ data TreeF a b = NodeF a [b]
 #endif
           )
 
+#ifdef LIFTED_FUNCTOR_CLASSES
+instance Eq2 TreeF where
+  liftEq2 f g (NodeF a b) (NodeF a' b') =
+    f a a' && (length b == length b') && and (zipWith g b b')
+
+instance Eq a => Eq1 (TreeF a) where
+  liftEq = liftEq2 (==)
+
+instance Ord2 TreeF where
+  liftCompare2 f g (NodeF a xs) (NodeF a' xs') = f a a'
+    `mappend` mconcat (zipWith g xs xs')
+    `mappend` compare (length xs) (length xs')
+
+instance Ord a => Ord1 (TreeF a) where
+  liftCompare = liftCompare2 compare
+
+instance Show2 TreeF where
+  liftShowsPrec2 = undefined -- TODO: implement
+
+instance Show a => Show1 (TreeF a) where
+  liftShowsPrec = liftShowsPrec2 showsPrec showList
+
+instance Read2 TreeF where
+  liftReadsPrec2 = undefined -- TODO: implement
+
+instance Read a => Read1 (TreeF a) where
+  liftReadsPrec = liftReadsPrec2 readsPrec readList
+
+#else
+instance Eq a   => Eq1   (TreeF a) where eq1        = (==)
+instance Ord a  => Ord1  (TreeF a) where compare1   = compare
+instance Show a => Show1 (TreeF a) where showsPrec1 = showsPrec
+instance Read a => Read1 (TreeF a) where readsPrec1 = readsPrec
+#endif
+
 instance Functor (TreeF a) where
   fmap f (NodeF x xs) = NodeF x (fmap f xs)
 
