@@ -360,9 +360,9 @@ instance Eq a => Eq1 (TreeF a) where
   liftEq = liftEq2 (==)
 
 instance Ord2 TreeF where
-  liftCompare2 f g (NodeF a xs) (NodeF a' xs') = f a a'
-    `mappend` mconcat (zipWith g xs xs')
-    `mappend` compare (length xs) (length xs')
+  liftCompare2 f g (NodeF a bs) (NodeF a' bs') = f a a'
+    `mappend` mconcat (zipWith g bs bs')
+    `mappend` compare (length bs) (length bs')
 
 instance Ord a => Ord1 (TreeF a) where
   liftCompare = liftCompare2 compare
@@ -395,28 +395,28 @@ instance Read a => Read1 (TreeF a) where readsPrec1 = readsPrec
 #endif
 
 instance Functor (TreeF a) where
-  fmap f (NodeF x xs) = NodeF x (fmap f xs)
+  fmap f (NodeF a bs) = NodeF a (fmap f bs)
 
 instance F.Foldable (TreeF a) where
-  foldMap f (NodeF _ xs) = F.foldMap f xs
+  foldMap f (NodeF _ bs) = F.foldMap f bs
 
 instance T.Traversable (TreeF a) where
-  traverse f (NodeF x xs) = NodeF x <$> T.traverse f xs
+  traverse f (NodeF a bs) = NodeF a <$> T.traverse f bs
 
 instance Bi.Bifunctor TreeF where
-  bimap f g (NodeF x xs) = NodeF (f x) (g <$> xs)
+  bimap f g (NodeF a bs) = NodeF (f a) (g <$> bs)
 
 instance Bi.Bifoldable TreeF where
-  bifoldMap f g (NodeF x xs) = mappend (f x) (F.foldMap g xs)
+  bifoldMap f g (NodeF a bs) = mappend (f a) (F.foldMap g bs)
 
 instance Bi.Bitraversable TreeF where
-  bitraverse f g (NodeF x xs) = NodeF <$> f x <*> T.traverse g xs
+  bitraverse f g (NodeF a bs) = NodeF <$> f a <*> T.traverse g bs
 
 instance Recursive (Tree a) where
-  project (Node n ns) = NodeF n ns
+  project (Node a bs) = NodeF a bs
 
 instance Corecursive (Tree a) where
-  embed (NodeF n ns) = Node n ns
+  embed (NodeF a bs) = Node a bs
 
 type instance Base (Tree a) = TreeF a
 
