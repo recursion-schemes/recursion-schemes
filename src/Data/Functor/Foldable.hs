@@ -29,6 +29,7 @@ module Data.Functor.Foldable
   -- * Base functors for fixed points
     Base
   , ListF(..)
+  , TreeF(..)
   -- * Fixed points
   , Fix(..), unfix
   , Mu(..), hoistMu
@@ -340,11 +341,41 @@ instance Corecursive [a] where
     Cons x (Right b) -> x : apo f b
     Nil -> []
 
-type instance Base (Tree a) = CofreeF [] a
+data TreeF a b = NodeF a [b]
+  deriving (Eq,Ord,Show,Read,Typeable
+#if HAS_GENERIC
+          , Generic
+#endif
+#if HAS_GENERIC1
+          , Generic1
+#endif
+          )
+
+instance Functor (TreeF a) where
+  fmap f (NodeF x xs) = NodeF x (fmap f xs)
+
+instance F.Foldable (TreeF a) where
+  foldMap f (NodeF _ xs) = F.foldMap f xs
+
+instance T.Traversable (TreeF a) where
+  traverse f (NodeF x xs) = NodeF x <$> T.traverse f xs
+
+instance Bi.Bifunctor TreeF where
+  bimap f g (NodeF x xs) = NodeF (f x) (g <$> xs)
+
+instance Bi.Bifoldable TreeF where
+  bifoldMap f g (NodeF x xs) = mappend (f x) (F.foldMap g xs)
+
+instance Bi.Bitraversable TreeF where
+  bitraverse f g (NodeF x xs) = NodeF <$> f x <*> T.traverse g xs
+
 instance Recursive (Tree a) where
-  project (Node x xs) = x CCTC.:< xs
+  project (Node n ns) = NodeF n ns
+
 instance Corecursive (Tree a) where
-  embed (x CCTC.:< xs) = Node x xs
+  embed (NodeF n ns) = Node n ns
+
+type instance Base (Tree a) = TreeF a
 
 type instance Base (NonEmpty a) = NonEmptyF a
 instance Recursive (NonEmpty a) where

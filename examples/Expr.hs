@@ -3,7 +3,6 @@
 {-# LANGUAGE DeriveGeneric #-}
 module Main where
 
-import Control.Comonad.Trans.Cofree (CofreeF((:<)))
 import Data.Functor.Foldable
 import Data.Functor.Foldable.TH
 import Language.Haskell.TH
@@ -11,7 +10,7 @@ import GHC.Generics (Generic)
 import Data.List (foldl')
 import Test.HUnit
 import Data.Functor.Identity
-import Data.Tree (Tree(Node))
+import Data.Tree
 
 data Expr a
     = Lit a
@@ -115,5 +114,5 @@ main = do
     lCoalg []       = LF { getLF = Nothing } -- to test field renamer
     lCoalg (x : xs) = LF { getLF = Just (x, xs) }
 
-    treeAlg :: Base (Tree Int) Int -> Int
-    treeAlg (r :< f) = r + sum f
+    treeAlg :: TreeF Int Int -> Int
+    treeAlg (NodeF r f) = r + sum f
