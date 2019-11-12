@@ -368,13 +368,21 @@ instance Ord a => Ord1 (TreeF a) where
   liftCompare = liftCompare2 compare
 
 instance Show2 TreeF where
-  liftShowsPrec2 = undefined -- TODO: implement
+  liftShowsPrec2 sa _ _ slb d (NodeF a bs) = showParen (d > 10)
+    $ showString "NodeF "
+    . sa 11 a
+    . showString " "
+    . slb bs
 
 instance Show a => Show1 (TreeF a) where
   liftShowsPrec = liftShowsPrec2 showsPrec showList
 
 instance Read2 TreeF where
-  liftReadsPrec2 = undefined -- TODO: implement
+  liftReadsPrec2 ra _ _ rlb d = readParen (d > 10) $ \s -> do
+    ("NodeF", s1) <- lex s
+    (a, s2) <- ra 11 s1
+    (bs, s3) <- rlb s2
+    return (NodeF a bs, s3)
 
 instance Read a => Read1 (TreeF a) where
   liftReadsPrec = liftReadsPrec2 readsPrec readList
