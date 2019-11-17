@@ -105,3 +105,18 @@ test-suite Expr
     containers
   if impl(ghc < 7.5)
     build-depends: ghc-prim
+
+test-suite Properties
+  type: exitcode-stdio-1.0
+  main-is: Main.hs
+  hs-source-dirs: tests
+  ghc-options: -Wall -Wno-orphans -threaded
+  build-depends:
+    base,
+    recursion-schemes,
+    QuickCheck,
+    quickcheck-classes,
+    containers
+  if impl(ghc < 7.5)
+    build-depends: ghc-prim
+
