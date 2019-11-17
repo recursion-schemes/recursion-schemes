@@ -110,7 +110,7 @@ test-suite Properties
   type: exitcode-stdio-1.0
   main-is: Main.hs
   hs-source-dirs: tests
-  ghc-options: -Wall -Wno-orphans -threaded
+  ghc-options: -Wall -fno-warn-orphans -threaded -fprint-explicit-kinds
   build-depends:
     base,
     recursion-schemes,
@@ -119,4 +119,9 @@ test-suite Properties
     containers
   if impl(ghc < 7.5)
     build-depends: ghc-prim
+  if !impl(ghc >= 8.2)
+    build-depends: bifunctors >= 4 && < 6
+  if impl(ghc > 8.5)
+    cpp-options: -DHAVE_QUANTIFIED_CONSTRAINTS
+
 

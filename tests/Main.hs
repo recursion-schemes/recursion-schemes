@@ -1,9 +1,22 @@
+{-# LANGUAGE CPP #-}
+
+#if HAVE_QUANTIFIED_CONSTRAINTS
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE QuantifiedConstraints #-}
+#endif
+
 import Control.Applicative
 import Data.Proxy
 import Test.QuickCheck
 import Test.QuickCheck.Classes
 
+import Data.Bitraversable
 import Data.Functor.Base
+#if HAVE_QUANTIFIED_CONSTRAINTS
+#else
+import Data.Functor.Classes
+#endif
 import Data.Functor.Foldable
 
 instance Arbitrary2 TreeF where
@@ -40,21 +53,38 @@ main = lawsCheckMany
   , ("NonEmptyF Int", laws1 (Proxy :: Proxy (NonEmptyF Int)))
   , ("NonEmptyF", laws2 (Proxy :: Proxy NonEmptyF))
   ]
-  where
-    laws0 p = ($ p) <$>
-      [ eqLaws
-      , ordLaws
-      , showLaws
-      , showReadLaws
-      ]
-    laws1 p = ($ p) <$>
-      [ functorLaws
-      , foldableLaws
-      , traversableLaws
-      ]
-    laws2 p = ($ p) <$>
-      [ bifunctorLaws
-      , bifoldableLaws
-      , bitraversableLaws
-      ]
+
+laws0 :: (Arbitrary p, Ord p, Show p, Read p) => Proxy p -> [Laws]
+laws0 p = ($ p) <$>
+  [ eqLaws
+  , ordLaws
+  , showLaws
+  , showReadLaws
+  ]
+
+laws1 ::
+#if HAVE_QUANTIFIED_CONSTRAINTS
+  (Traversable f, forall a. Eq a => Eq (f a), forall a. Show a => Show (f a), forall a. Arbitrary a => Arbitrary (f a))
+#else
+  (Arbitrary1 f, Eq1 f, Show1 f, Traversable f)
+#endif
+   => Proxy f -> [Laws]
+laws1 p = ($ p) <$>
+  [ functorLaws
+  , foldableLaws
+  , traversableLaws
+  ]
+
+laws2 ::
+#if HAVE_QUANTIFIED_CONSTRAINTS
+  (Bitraversable f, forall a b. (Eq a, Eq b) => Eq (f a b), forall a b. (Show a, Show b) => Show (f a b), forall a b. (Arbitrary a, Arbitrary b) => Arbitrary (f a b))
+#else
+  (Bitraversable f, Eq2 f, Show2 f, Arbitrary2 f)
+#endif
+   => Proxy f -> [Laws]
+laws2 p = ($ p) <$>
+  [ bifunctorLaws
+  , bifoldableLaws
+  , bitraversableLaws
+  ]
 
