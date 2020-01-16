@@ -110,7 +110,7 @@ test-suite Properties
   type: exitcode-stdio-1.0
   main-is: Main.hs
   hs-source-dirs: tests
-  ghc-options: -Wall -fno-warn-orphans -threaded -fprint-explicit-kinds
+  ghc-options: -Wall -fno-warn-orphans -threaded
   build-depends:
     base,
     recursion-schemes,
