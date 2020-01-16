@@ -11,7 +11,6 @@ import Test.QuickCheck.Classes
 
 import Data.Bitraversable
 import Data.Functor.Base
-import Data.Functor.Classes
 import Data.Functor.Foldable
 
 instance Arbitrary2 TreeF where
@@ -59,7 +58,6 @@ laws0 p = ($ p) <$>
 
 laws1 ::
   (Traversable f, forall a. Eq a => Eq (f a), forall a. Show a => Show (f a), forall a. Arbitrary a => Arbitrary (f a))
-  (Arbitrary1 f, Eq1 f, Show1 f, Traversable f)
    => Proxy f -> [Laws]
 laws1 p = ($ p) <$>
   [ functorLaws
@@ -69,13 +67,13 @@ laws1 p = ($ p) <$>
 
 laws2 ::
   (Bitraversable f, forall a b. (Eq a, Eq b) => Eq (f a b), forall a b. (Show a, Show b) => Show (f a b), forall a b. (Arbitrary a, Arbitrary b) => Arbitrary (f a b))
-  (Bitraversable f, Eq2 f, Show2 f, Arbitrary2 f)
    => Proxy f -> [Laws]
 laws2 p = ($ p) <$>
   [ bifunctorLaws
   , bifoldableLaws
   , bitraversableLaws
   ]
+
 #else
 main :: IO ()
 main = putStrLn "Can't test laws for this version of GHC"
