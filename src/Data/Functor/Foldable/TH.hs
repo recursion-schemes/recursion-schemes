@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, Rank2Types #-}
+{-# LANGUAGE CPP, PatternGuards, Rank2Types #-}
 module Data.Functor.Foldable.TH
   ( makeBaseFunctor
   , makeBaseFunctorWith
@@ -321,9 +321,14 @@ toCon (ConstructorInfo { constructorName       = name
      in case variant of
           NormalConstructor        -> NormalC name $ zip bangs ftys
           RecordConstructor fnames -> RecC name $ zip3 fnames bangs ftys
-          InfixConstructor         -> let [bang1, bang2] = bangs
-                                          [fty1,  fty2]  = ftys
-                                       in InfixC (bang1, fty1) name (bang2, fty2)
+          InfixConstructor
+            |  [bang1, bang2] <- bangs
+            ,  [fty1,  fty2]  <- ftys
+            -> InfixC (bang1, fty1) name (bang2, fty2)
+
+            |  otherwise
+            -> error $ "makeBaseFunctor: Encountered an InfixConstructor "
+                    ++ "without exactly two fields"
   where
 #if MIN_VERSION_template_haskell(2,11,0)
     toBang (FieldStrictness upkd strct) = Bang (toSourceUnpackedness upkd)
