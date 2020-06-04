@@ -196,7 +196,11 @@ makePrimForDI' rules isNewtype tyName vars cons = do
 
     -- type instance Base
     baseDec <- tySynInstDCompat baseTypeName Nothing [pure s] (pure sF)
-    let sCxt = [AppT (ConT functorTypeName) sF]
+#if MIN_VERSION_template_haskell(2,10,0)
+    let sCxt = [AppT (ConT functorTypeName) sF | not (null vars')]
+#else
+    let sCxt = [ClassP functorTypeName [sF] | not (null vars')]
+#endif
 
     -- instance Recursive
     projDec <- FunD projectValName <$> mkMorphism id (_baseRulesCon rules) cons'
