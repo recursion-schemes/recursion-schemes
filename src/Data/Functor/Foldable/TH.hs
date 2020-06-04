@@ -9,6 +9,11 @@ module Data.Functor.Foldable.TH
   , baseRulesField
   ) where
 
+#if MIN_VERSION_base(4,8,0)
+import Data.Bifunctor (first)
+#else
+import Control.Arrow (first)
+#endif
 import Control.Applicative as A
 import Control.Monad
 import Data.Traversable as T
@@ -159,12 +164,12 @@ makePrimForDI' rules isNewtype tyName vars cons = do
 
     -- #33
     cons' <- traverse (conTypeTraversal resolveTypeSynonyms) cons
-    let consF
-          = toCon
-          . conNameMap (_baseRulesCon rules)
-          . conFieldNameMap (_baseRulesField rules)
-          . conTypeMap (substType s r)
-          <$> cons'
+    let consF' = conTypeTraversal (first snd . substType s r)
+               . conNameMap (_baseRulesCon rules)
+               . conFieldNameMap (_baseRulesField rules)
+               <$> cons'
+    let sCxt = concat $ fmap fst consF'
+    let consF = toCon . snd <$> consF'
 
     -- Data definition
     let dataDec = case consF of
@@ -196,11 +201,6 @@ makePrimForDI' rules isNewtype tyName vars cons = do
 
     -- type instance Base
     baseDec <- tySynInstDCompat baseTypeName Nothing [pure s] (pure sF)
-#if MIN_VERSION_template_haskell(2,10,0)
-    let sCxt = [AppT (ConT functorTypeName) sF | not (null vars')]
-#else
-    let sCxt = [ClassP functorTypeName [sF] | not (null vars')]
-#endif
 
     -- instance Recursive
     projDec <- FunD projectValName <$> mkMorphism id (_baseRulesCon rules) cons'
@@ -260,9 +260,6 @@ conNameMap = over conNameTraversal
 conFieldNameMap :: (Name -> Name) -> ConstructorInfo -> ConstructorInfo
 conFieldNameMap = over conFieldNameTraversal
 
-conTypeMap :: (Type -> Type) -> ConstructorInfo -> ConstructorInfo
-conTypeMap = over conTypeTraversal
-
 -------------------------------------------------------------------------------
 -- Lenses
 -------------------------------------------------------------------------------
@@ -290,27 +287,58 @@ typeVars = map tvName
 conAppsT :: Name -> [Type] -> Type
 conAppsT conName = foldl AppT (ConT conName)
 
--- | Provides substitution for types
+hasTyVar :: Type -> Bool
+hasTyVar t = case t of
+  VarT _ -> True
+  ForallT v _ _ -> not (null v)
+#if MIN_VERSION_template_haskell(2,16,0)
+  ForallVisT v _ -> not (null v)
+#endif
+  _ -> False
+
+-- | Provides substitution for types, autodetecting necessary Functor instances
 substType
     :: Type
     -> Type
     -> Type
-    -> Type
+    -> ((Bool, Cxt), Type)
 substType a b = go
   where
-    go x | x == a         = b
-    go (VarT n)           = VarT n
-    go (AppT l r)         = AppT (go l) (go r)
-    go (ForallT xs ctx t) = ForallT xs ctx (go t)
-    -- This may fail with kind error
-    go (SigT t k)         = SigT (go t) k
-#if MIN_VERSION_template_haskell(2,11,0)
-    go (InfixT l n r)     = InfixT (go l) n (go r)
-    go (UInfixT l n r)    = UInfixT (go l) n (go r)
-    go (ParensT t)        = ParensT (go t)
+    go x | x == a           = ((True, []), b)
+    go (VarT n)             = ((False, []), VarT n)
+    go (AppT l r)           =
+        let ((br, cr), tr) = go r
+            cr' = if br && hasTyVar l
+#if MIN_VERSION_template_haskell(2,10,0)
+                then AppT (ConT functorTypeName) l : cr
+#else
+                then ClassP functorTypeName [l] : cr
 #endif
-    -- Rest are unchanged
-    go x = x
+                else cr
+        in ((br, cr'), AppT l tr)
+    go (ForallT xs ctx t)   = ForallT xs ctx <$> go t
+#if MIN_VERSION_template_haskell(2,16,0)
+    go (ForallVisT xs t)    = ForallVisT xs <$> go t
+#endif
+    -- These may fail with kind error
+#if MIN_VERSION_template_haskell(2,15,0)
+    go (AppKindT t k)       = (flip AppKindT k) <$> go t
+#endif
+    go (SigT t k)           = (flip SigT k) <$> go t
+#if MIN_VERSION_template_haskell(2,11,0)
+    go (InfixT l n r)       = (union ml mr, InfixT l' n r')
+     where (ml, l') = go l; (mr, r') = go r
+    go (UInfixT l n r)      = (union ml mr, UInfixT l' n r')
+     where (ml, l') = go l; (mr, r') = go r
+    go (ParensT t)          = ParensT <$> go t
+#endif
+#if MIN_VERSION_template_haskell(2,15,0)
+    go (ImplicitParamT n t) = ImplicitParamT n <$> go t
+#endif
+    -- Rest don't recurse
+    go x = ((False, []), x)
+    union (bl, ll) (br, lr) = (bl || br, ll ++ lr)
+
 
 toCon :: ConstructorInfo -> Con
 toCon (ConstructorInfo { constructorName       = name
