@@ -150,6 +150,7 @@ makePrimForDI' rules isNewtype tyName vars cons = do
     let tyNameF = _baseRulesType rules tyName
     -- Recursive type
     let s = conAppsT tyName vars'
+    let sF = conAppsT tyNameF vars'
     -- Additional argument
     rName <- newName "r"
     let r = VarT rName
@@ -194,23 +195,23 @@ makePrimForDI' rules isNewtype tyName vars cons = do
 #endif
 
     -- type instance Base
-    baseDec <- tySynInstDCompat baseTypeName Nothing
-                                [pure s] (pure $ conAppsT tyNameF vars')
+    baseDec <- tySynInstDCompat baseTypeName Nothing [pure s] (pure sF)
+    let sCxt = [AppT (ConT functorTypeName) sF]
 
     -- instance Recursive
     projDec <- FunD projectValName <$> mkMorphism id (_baseRulesCon rules) cons'
 #if MIN_VERSION_template_haskell(2,11,0)
-    let recursiveDec = InstanceD Nothing [] (ConT recursiveTypeName `AppT` s) [projDec]
+    let recursiveDec = InstanceD Nothing sCxt (ConT recursiveTypeName `AppT` s) [projDec]
 #else
-    let recursiveDec = InstanceD [] (ConT recursiveTypeName `AppT` s) [projDec]
+    let recursiveDec = InstanceD sCxt (ConT recursiveTypeName `AppT` s) [projDec]
 #endif
 
     -- instance Corecursive
     embedDec <- FunD embedValName <$> mkMorphism (_baseRulesCon rules) id cons'
 #if MIN_VERSION_template_haskell(2,11,0)
-    let corecursiveDec = InstanceD Nothing [] (ConT corecursiveTypeName `AppT` s) [embedDec]
+    let corecursiveDec = InstanceD Nothing sCxt (ConT corecursiveTypeName `AppT` s) [embedDec]
 #else
-    let corecursiveDec = InstanceD [] (ConT corecursiveTypeName `AppT` s) [embedDec]
+    let corecursiveDec = InstanceD sCxt (ConT corecursiveTypeName `AppT` s) [embedDec]
 #endif
 
     -- Combine
