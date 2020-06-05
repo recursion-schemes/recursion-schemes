@@ -8,7 +8,7 @@
 #
 # For more information, see https://github.com/haskell-CI/haskell-ci
 #
-# version: 0.10
+# version: 0.10.1
 #
 version: ~> 1.0
 language: c
@@ -157,11 +157,11 @@ script:
   # Testing...
   - ${CABAL} v2-test $WITHCOMPILER ${TEST} ${BENCH} all
   # Doctest...
-  - if [ $HCNUMVER -ge 80000 ] ; then (cd ${PKGDIR_recursion_schemes} && doctest -DCURRENT_PACKAGE_KEY='"recursion-schemes"' src) ; fi
+  - if [ $HCNUMVER -ge 80000 ] ; then (cd ${PKGDIR_recursion_schemes} && doctest -DCURRENT_PACKAGE_KEY='"recursion-schemes"' -this-unit-id recursion-schemes src) ; fi
   # cabal check...
   - (cd ${PKGDIR_recursion_schemes} && ${CABAL} -vnormal check)
   # haddock...
   - ${CABAL} v2-haddock $WITHCOMPILER --with-haddock $HADDOCK ${TEST} ${BENCH} all
 
-# REGENDATA ("0.10",["--output=.travis.yml","--config=cabal.haskell-ci","cabal.project"])
+# REGENDATA ("0.10.1",["--output=.travis.yml","--config=cabal.haskell-ci","cabal.project"])
 # EOF

@@ -139,7 +139,7 @@ import           Data.Functor.Base hiding (head, tail)
 import qualified Data.Functor.Base as NEF (NonEmptyF(..))
 
 -- $setup
--- >>> :set -XDeriveFunctor
+-- >>> :set -XDeriveFunctor -XScopedTypeVariables
 -- >>> import Control.Monad (void)
 -- >>> import Data.Char (toUpper)
 
@@ -797,8 +797,9 @@ transverse n = cata (fmap embed . n)
 -- >>> data Pair a = Pair a a deriving Functor
 --
 -- >>> :{
--- let zipWith' :: (a -> a -> b) -> [a] -> [a] -> [b]
+-- let zipWith' :: forall a b. (a -> a -> b) -> [a] -> [a] -> [b]
 --     zipWith' f xs ys = cotransverse g (Pair xs ys) where
+--       g :: Pair (ListF a c) -> ListF b (Pair c)
 --       g (Pair Nil        _)          = Nil
 --       g (Pair _          Nil)        = Nil
 --       g (Pair (Cons x a) (Cons y b)) = Cons (f x y) (Pair a b)
