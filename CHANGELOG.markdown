@@ -1,3 +1,6 @@
+## Next
+* Add instances for `Tree` (from `containers`)
+
 ## 5.1.3 [2019.04.26]
 * Support `th-abstraction-0.3.0.0` or later.
 

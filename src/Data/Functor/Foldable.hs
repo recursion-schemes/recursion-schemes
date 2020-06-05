@@ -109,6 +109,7 @@ import Data.Function (on)
 import Data.Functor.Classes
 import Data.Functor.Compose (Compose(..))
 import Data.List.NonEmpty(NonEmpty((:|)), nonEmpty, toList)
+import Data.Tree (Tree (..))
 import Text.Read
 import Text.Show
 #ifdef __GLASGOW_HASKELL__
@@ -120,20 +121,9 @@ import qualified Data.Data as Data
 #if HAS_GENERIC
 import GHC.Generics (Generic (..), M1 (..), V1, U1, K1 (..), (:+:) (..), (:*:) (..))
 #endif
-#if HAS_GENERIC1
-import GHC.Generics (Generic1)
-#endif
 #endif
 import Numeric.Natural
-import Data.Monoid (Monoid (..))
 import Prelude
-
-import qualified Data.Foldable as F
-import qualified Data.Traversable as T
-
-import qualified Data.Bifunctor as Bi
-import qualified Data.Bifoldable as Bi
-import qualified Data.Bitraversable as Bi
 
 import           Data.Functor.Base hiding (head, tail)
 import qualified Data.Functor.Base as NEF (NonEmptyF(..))
@@ -235,93 +225,6 @@ unfold = ana
 refold :: Functor f => (f b -> b) -> (a -> f a) -> a -> b
 refold = hylo
 
--- | Base functor of @[]@.
-data ListF a b = Nil | Cons a b
-  deriving (Eq,Ord,Show,Read,Typeable
-#if HAS_GENERIC
-          , Generic
-#endif
-#if HAS_GENERIC1
-          , Generic1
-#endif
-          )
-
-#ifdef LIFTED_FUNCTOR_CLASSES
-instance Eq2 ListF where
-  liftEq2 _ _ Nil        Nil          = True
-  liftEq2 f g (Cons a b) (Cons a' b') = f a a' && g b b'
-  liftEq2 _ _ _          _            = False
-
-instance Eq a => Eq1 (ListF a) where
-  liftEq = liftEq2 (==)
-
-instance Ord2 ListF where
-  liftCompare2 _ _ Nil        Nil          = EQ
-  liftCompare2 _ _ Nil        _            = LT
-  liftCompare2 _ _ _          Nil          = GT
-  liftCompare2 f g (Cons a b) (Cons a' b') = f a a' `mappend` g b b'
-
-instance Ord a => Ord1 (ListF a) where
-  liftCompare = liftCompare2 compare
-
-instance Show a => Show1 (ListF a) where
-  liftShowsPrec = liftShowsPrec2 showsPrec showList
-
-instance Show2 ListF where
-  liftShowsPrec2 _  _ _  _ _ Nil        = showString "Nil"
-  liftShowsPrec2 sa _ sb _ d (Cons a b) = showParen (d > 10)
-    $ showString "Cons "
-    . sa 11 a
-    . showString " "
-    . sb 11 b
-
-instance Read2 ListF where
-  liftReadsPrec2 ra _ rb _ d = readParen (d > 10) $ \s -> nil s ++ cons s
-    where
-      nil s0 = do
-        ("Nil", s1) <- lex s0
-        return (Nil, s1)
-      cons s0 = do
-        ("Cons", s1) <- lex s0
-        (a,      s2) <- ra 11 s1
-        (b,      s3) <- rb 11 s2
-        return (Cons a b, s3)
-
-instance Read a => Read1 (ListF a) where
-  liftReadsPrec = liftReadsPrec2 readsPrec readList
-
-#else
-instance Eq a   => Eq1   (ListF a) where eq1        = (==)
-instance Ord a  => Ord1  (ListF a) where compare1   = compare
-instance Show a => Show1 (ListF a) where showsPrec1 = showsPrec
-instance Read a => Read1 (ListF a) where readsPrec1 = readsPrec
-#endif
-
--- These instances cannot be auto-derived on with GHC <= 7.6
-instance Functor (ListF a) where
-  fmap _ Nil        = Nil
-  fmap f (Cons a b) = Cons a (f b)
-
-instance F.Foldable (ListF a) where
-  foldMap _ Nil        = Data.Monoid.mempty
-  foldMap f (Cons _ b) = f b
-
-instance T.Traversable (ListF a) where
-  traverse _ Nil        = pure Nil
-  traverse f (Cons a b) = Cons a <$> f b
-
-instance Bi.Bifunctor ListF where
-  bimap _ _ Nil        = Nil
-  bimap f g (Cons a b) = Cons (f a) (g b)
-
-instance Bi.Bifoldable ListF where
-  bifoldMap _ _ Nil        = mempty
-  bifoldMap f g (Cons a b) = mappend (f a) (g b)
-
-instance Bi.Bitraversable ListF where
-  bitraverse _ _ Nil        = pure Nil
-  bitraverse f g (Cons a b) = Cons <$> f a <*> g b
-
 type instance Base [a] = ListF a
 instance Recursive [a] where
   project (x:xs) = Cons x xs
@@ -344,6 +247,12 @@ instance Recursive (NonEmpty a) where
   project (x:|xs) = NonEmptyF x $ nonEmpty xs
 instance Corecursive (NonEmpty a) where
   embed = (:|) <$> NEF.head <*> (maybe [] toList <$> NEF.tail)
+
+type instance Base (Tree a) = TreeF a
+instance Recursive (Tree a) where
+  project (Node x xs) = NodeF x xs
+instance Corecursive (Tree a) where
+  embed (NodeF x xs) = Node x xs
 
 type instance Base Natural = Maybe
 instance Recursive Natural where
