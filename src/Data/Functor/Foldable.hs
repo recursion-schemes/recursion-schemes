@@ -29,10 +29,6 @@ module Data.Functor.Foldable
   -- * Base functors for fixed points
     Base
   , ListF(..)
-  -- * Fixed points
-  , Fix(..), unfix
-  , Mu(..), hoistMu
-  , Nu(..), hoistNu
   -- * Folding
   , Recursive(..)
   -- ** Combinators
@@ -87,6 +83,10 @@ module Data.Functor.Foldable
   , cataA
   , transverse
   , cotransverse
+  -- * Fixed points
+  , Fix(..), unfix
+  , Mu(..), hoistMu
+  , Nu(..), hoistNu
   ) where
 
 import Control.Applicative
@@ -129,24 +129,88 @@ import           Data.Functor.Base hiding (head, tail)
 import qualified Data.Functor.Base as NEF (NonEmptyF(..))
 
 -- $setup
--- >>> :set -XDeriveFunctor -XScopedTypeVariables
+-- >>> :set -XDeriveFunctor -XScopedTypeVariables -XLambdaCase -XGADTs
 -- >>> import Control.Monad (void)
 -- >>> import Data.Char (toUpper)
+-- >>> import Data.Foldable (traverse_)
+-- >>> import Data.List (partition)
+-- >>> import Data.Maybe (maybeToList)
+--
+-- >>> let showTree = putStrLn . go where go (Node x xs) = if null xs then x else "(" ++ unwords (x : map go xs) ++ ")"
 
+-- | Obtain the base functor for a recursive datatype.
+--
+-- The core idea of this library is that instead of writing recursive functions
+-- on a recursive datatype, we prefer to write non-recursive functions on a
+-- related, non-recursive datatype we call the "base functor".
+--
+-- For example, @[a]@ is a recursive type, and its corresponding base functor is
+-- @'ListF' a@:
+--
+-- @
+-- data 'ListF' a b = 'Nil' | 'Cons' a b
+-- type instance 'Base' [a] = 'ListF' a
+-- @
+--
+-- The relationship between those two types is that if we replace @b@ with
+-- @'ListF' a@, we obtain a type which is isomorphic to @[a]@.
+--
 type family Base t :: * -> *
 
+-- | A recursive datatype which can be unrolled one recursion layer at a time.
+--
+-- For example, a value of type @[a]@ can be unrolled into a @'ListF' a [a]@.
+-- Ifthat unrolled value is a 'Cons', it contains another @[a]@ which can be
+-- unrolled as well, and so on.
+--
+-- Typically, 'Recursive' types also have a 'Corecursive' instance, in which
+-- case 'project' and 'embed' are inverses.
 class Functor (Base t) => Recursive t where
+  -- | Unroll a single recursion layer.
+  --
+  -- >>> project [1,2,3]
+  -- Cons 1 [2,3]
   project :: t -> Base t t
 #ifdef HAS_GENERIC
   default project :: (Generic t, Generic (Base t t), GCoerce (Rep t) (Rep (Base t t))) => t -> Base t t
   project = to . gcoerce . from
 #endif
 
+  -- | A generalization of 'foldr'. The elements of the base functor, called the
+  -- "recursive positions", give the result of folding the sub-tree at that
+  -- position.
+  --
+  -- >>> :{
+  -- >>> let oursum = cata $ \case
+  -- >>>        Nil        -> 0
+  -- >>>        Cons x acc -> x + acc
+  -- >>> :}
+  --
+  -- >>> oursum [1,2,3]
+  -- 6
+  --
   cata :: (Base t a -> a) -- ^ a (Base t)-algebra
        -> t               -- ^ fixed point
        -> a               -- ^ result
   cata f = c where c = f . fmap c . project
 
+  -- | A variant of 'cata' in which recursive positions also include the
+  -- original sub-tree, in addition to the result of folding that sub-tree.
+  --
+  -- A very simple example is collecting all recursive children of a value
+  --
+  -- >>> let tree = Node "a" [Node "b" [Node "c" [], Node "d" []], Node "e" [], Node "f" []]
+  -- >>> showTree tree
+  -- (a (b c d) e f)
+  --
+  -- >>> traverse_ showTree $ para (\fun -> embed (fmap fst fun) : foldMap snd fun) tree
+  -- (a (b c d) e f)
+  -- (b c d)
+  -- c
+  -- d
+  -- e
+  -- f
+  --
   para :: (Base t (t, a) -> a) -> t -> a
   para t = p where p x = t . fmap ((,) <*> p) $ project x
 
@@ -178,13 +242,39 @@ distPara = distZygo embed
 distParaT :: (Corecursive t, Comonad w) => (forall b. Base t (w b) -> w (Base t b)) -> Base t (EnvT t w a) -> EnvT t w (Base t a)
 distParaT t = distZygoT embed t
 
+-- | A recursive datatype which can be rolled up one recursion layer at a time.
+--
+-- For example, a value of type @'ListF' a [a]@ can be rolled up into a @[a]@.
+-- This @[a]@ can then be used in a 'Cons' to construct another @'ListF' a [a]@,
+-- which can be rolled up as well, and so on.
+--
+-- Typically, 'Corecursive' types also have a 'Recursive' instance, in which
+-- case 'embed' and 'project' are inverses.
 class Functor (Base t) => Corecursive t where
+
+  -- | Roll up a single recursion layer.
+  --
+  -- >>> embed (Cons 1 [2,3])
+  -- [1,2,3]
   embed :: Base t t -> t
 #ifdef HAS_GENERIC
   default embed :: (Generic t, Generic (Base t t), GCoerce (Rep (Base t t)) (Rep t)) => Base t t -> t
   embed = to . gcoerce . from
 #endif
 
+  -- | A generalization of 'unfoldr'. The starting seed is expanded into a base
+  -- functor whose recursive positions contain more seeds, which are themselves
+  -- expanded, and so on.
+  --
+  -- >>> :{
+  -- >>> let ourEnumFromTo :: Int -> Int -> [Int]
+  -- >>>     ourEnumFromTo lo hi = ana go lo where
+  -- >>>         go i = if i > hi then Nil else Cons i (i + 1)
+  -- >>> :}
+  --
+  -- >>> ourEnumFromTo 1 4
+  -- [1,2,3,4]
+  --
   ana
     :: (a -> Base t a) -- ^ a (Base t)-coalgebra
     -> a               -- ^ seed
@@ -213,15 +303,40 @@ class Functor (Base t) => Corecursive t where
     -> t
   gpostpro k e g = a . return where a = embed . fmap (hoist e . a . join) . k . liftM g
 
+-- | An optimized version of @cata f . ana g@.
+--
+-- Useful when your recursion structure is shaped like a particular recursive
+-- datatype, but you're neither consuming nor producing that recursive datatype.
+-- For example, the recursion structure of quick sort is a binary tree, but its
+-- input and output is a list, not a binary tree.
+--
+-- >>> data BinTreeF a b = Tip | Branch b a b deriving (Functor)
+--
+-- >>> :{
+-- >>> let quicksort :: Ord a => [a] -> [a]
+-- >>>     quicksort = hylo merge split where
+-- >>>         split []     = Tip
+-- >>>         split (x:xs) = let (l, r) = partition (<x) xs in Branch l x r
+-- >>>
+-- >>>         merge Tip            = []
+-- >>>         merge (Branch l x r) = l ++ [x] ++ r
+-- >>> :}
+--
+-- >>> quicksort [1,5,2,8,4,9,8]
+-- [1,2,4,5,8,8,9]
+--
 hylo :: Functor f => (f b -> b) -> (a -> f a) -> a -> b
 hylo f g = h where h = f . fmap h . g
 
+-- | An alias for 'cata'.
 fold :: Recursive t => (Base t a -> a) -> t -> a
 fold = cata
 
+-- | An alias for 'ana'.
 unfold :: Corecursive t => (a -> Base t a) -> a -> t
 unfold = ana
 
+-- | An alias for 'hylo'.
 refold :: Functor f => (f b -> b) -> (a -> f a) -> a -> b
 refold = hylo
 
@@ -440,10 +555,20 @@ instance Functor f => Recursive (Fix f) where
 instance Functor f => Corecursive (Fix f) where
   embed = Fix
 
+-- | Convert from one recursive type to another.
+--
+-- >>> showTree $ hoist (\(NonEmptyF h t) -> NodeF [h] (maybeToList t)) ( 'a' :| "bcd")
+-- (a (b (c d)))
+--
 hoist :: (Recursive s, Corecursive t)
       => (forall a. Base s a -> Base t a) -> s -> t
 hoist n = cata (embed . n)
 
+-- | Convert from one recursive representation to another.
+--
+-- >>> refix ["foo", "bar"] :: Fix (ListF String)
+-- Fix (Cons "foo" (Fix (Cons "bar" (Fix Nil))))
+--
 refix :: (Recursive s, Corecursive t, Base s ~ Base t) => s -> t
 refix = cata embed
 
