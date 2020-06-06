@@ -1,5 +1,10 @@
-## Next
+## 5.2
+
 * Add instances for `Tree` (from `containers`)
+* Add some haddocks and basic examples
+* Generalize the type of `makeBaseFunctor(With)`, such that
+  it can take also `Dec`. This way you may supply context for `Recursive`
+  and `Corecursive` instances.
 
 ## 5.1.3 [2019.04.26]
 * Support `th-abstraction-0.3.0.0` or later.
