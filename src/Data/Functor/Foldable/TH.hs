@@ -1,7 +1,6 @@
 {-# LANGUAGE CPP, PatternGuards, Rank2Types #-}
 module Data.Functor.Foldable.TH
-  ( makeBaseFunctor
-  , makeBaseFunctorWith
+  ( MakeBaseFunctor(..)
   , BaseRules
   , baseRules
   , baseRulesType
@@ -22,6 +21,14 @@ import Data.Orphans ()
 import Data.Version (showVersion)
 import Paths_recursion_schemes (version)
 #endif
+
+#ifdef __HADDOCK__
+import Data.Functor.Foldable
+#endif
+
+-- $setup
+-- >>> :set -XTemplateHaskell -XTypeFamilies -XDeriveTraversable -XScopedTypeVariables
+-- >>> import Data.Functor.Foldable
 
 -- | Build base functor with a sensible default configuration.
 --
@@ -59,9 +66,6 @@ import Paths_recursion_schemes (version)
 --     'embed' (x :*$ y)  = x :* y
 -- @
 --
--- @
--- 'makeBaseFunctor' = 'makeBaseFunctorWith' 'baseRules'
--- @
 --
 -- /Notes:/
 --
@@ -70,12 +74,99 @@ import Paths_recursion_schemes (version)
 -- as we don't try to do better than
 -- <https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/glasgow_exts.html#deriving-functor-instances GHC's DeriveFunctor>.
 --
-makeBaseFunctor :: Name -> DecsQ
-makeBaseFunctor = makeBaseFunctorWith baseRules
+-- Allowing 'makeBaseFunctor' to take both 'Name's and 'Dec's as an argument is why it exists as a method in a type class.
+-- For trickier data-types, like rose-tree (see also 'Cofree'):
+--
+-- @
+-- data Rose f a = Rose a (f (Rose f a))
+-- @
+--
+-- we can invoke 'makeBaseFunctor' with an instance declaration
+-- to provide needed context for instances. (c.f. @StandaloneDeriving@)
+--
+-- @
+-- 'makeBaseFunctor' [d| instance Functor f => Recursive (Rose f a) |]
+-- @
+--
+-- will create
+--
+-- @
+-- data RoseF f a r = RoseF a (f fr)
+--   deriving ('Functor', 'Foldable', 'Traversable')
+--
+-- type instance 'Base' (Rose f a) = RoseF f a
+--
+-- instance Functor f => 'Recursive' (Rose f a) where
+--   'project' (Rose x xs) = RoseF x xs
+--
+-- instance Functor f => 'Corecursive' (Rose f a) where
+--   'embed' (RoseF x xs) = Rose x xs
+-- @
+--
+-- Some doctests:
+--
+-- >>> data Expr a = Lit a | Add (Expr a) (Expr a) | Expr a :* [Expr a]
+-- >>> ; makeBaseFunctor ''Expr
+--
+-- >>> :t AddF
+-- AddF :: r -> r -> ExprF a r
+--
+-- >>> data Rose f a = Rose a (f (Rose f a))
+-- >>> ; makeBaseFunctor [d| instance Functor f => Recursive (Rose f a) |]
+--
+-- >>> :t RoseF
+-- RoseF :: a -> f r -> RoseF f a r
+--
+-- >>> let rose = Rose 1 (Just (Rose 2 (Just (Rose 3 Nothing))))
+-- >>> cata (\(RoseF x f) -> x + maybe 0 id f) rose
+-- 6
+--
+class MakeBaseFunctor a where
+    -- |
+    -- @
+    -- 'makeBaseFunctor' = 'makeBaseFunctorWith' 'baseRules'
+    -- @
+    makeBaseFunctor :: a -> DecsQ
+    makeBaseFunctor = makeBaseFunctorWith baseRules
 
--- | Build base functor with a custom configuration.
-makeBaseFunctorWith :: BaseRules -> Name -> DecsQ
-makeBaseFunctorWith rules name = reifyDatatype name >>= makePrimForDI rules
+    -- | Build base functor with a custom configuration.
+    makeBaseFunctorWith :: BaseRules -> a -> DecsQ
+
+instance MakeBaseFunctor a => MakeBaseFunctor [a] where
+    makeBaseFunctorWith rules a = fmap concat (T.traverse (makeBaseFunctorWith rules) a)
+
+instance MakeBaseFunctor a => MakeBaseFunctor (Q a) where
+    makeBaseFunctorWith rules a = makeBaseFunctorWith rules =<< a
+
+instance MakeBaseFunctor Name where
+    makeBaseFunctorWith rules name = reifyDatatype name >>= makePrimForDI rules Nothing
+
+-- | Expects declarations of 'Recursive' or 'Corecursive' instances, e.g.
+--
+-- @
+-- makeBaseFunctor [d| instance Functor f => Recursive (Rose f a) |]
+-- @
+--
+-- This way we can provide a context for generated instances.
+-- Note that this instance's 'makeBaseFunctor' still generates all of
+-- 'Base' type instance, 'Recursive' and 'Corecursive' instances.
+--
+instance MakeBaseFunctor Dec where
+#if MIN_VERSION_template_haskell(2,11,0)
+    makeBaseFunctorWith rules (InstanceD overlaps ctx classHead []) = do
+        let instanceFor = InstanceD overlaps ctx
+#else
+    makeBaseFunctorWith rules (InstanceD ctx classHead []) = do
+        let instanceFor = InstanceD ctx
+#endif
+        case classHead of
+          ConT u `AppT` t | u == recursiveTypeName || u == corecursiveTypeName -> do
+              name <- headOfType t
+              di <- reifyDatatype name
+              makePrimForDI rules (Just $ \n -> instanceFor (ConT n `AppT` t)) di
+          _ -> fail $ "makeBaseFunctor: expected an instance head like `ctx => Recursive (T a b ...)`, got " ++ show classHead
+
+    makeBaseFunctorWith _ _ = fail "makeBaseFunctor(With): expected an empty instance declaration"
 
 -- | Rules of renaming data names
 data BaseRules = BaseRules
@@ -119,15 +210,19 @@ toFName = mkName . f . nameBase
     isInfixName :: String -> Bool
     isInfixName = all isSymbolChar
 
-makePrimForDI :: BaseRules -> DatatypeInfo -> DecsQ
-makePrimForDI rules
+makePrimForDI :: BaseRules
+              -> Maybe (Name -> [Dec] -> Dec) -- ^ make instance
+              -> DatatypeInfo
+              -> DecsQ
+makePrimForDI rules mkInstance'
   (DatatypeInfo { datatypeName      = tyName
                 , datatypeInstTypes = instTys
                 , datatypeCons      = cons
                 , datatypeVariant   = variant }) = do
     when isDataFamInstance $
       fail "makeBaseFunctor: Data families are currently not supported."
-    makePrimForDI' rules (variant == Newtype) tyName
+    makePrimForDI' rules mkInstance'
+                   (variant == Newtype) tyName
                    (map toTyVarBndr instTys) cons
   where
     isDataFamInstance = case variant of
@@ -141,9 +236,11 @@ makePrimForDI rules
     toTyVarBndr (SigT (VarT n) k) = KindedTV n k
     toTyVarBndr _                 = error "toTyVarBndr"
 
-makePrimForDI' :: BaseRules -> Bool -> Name -> [TyVarBndr]
+makePrimForDI' :: BaseRules
+               -> Maybe (Name -> [Dec] -> Dec) -- ^ make instance
+               -> Bool -> Name -> [TyVarBndr]
                -> [ConstructorInfo] -> DecsQ
-makePrimForDI' rules isNewtype tyName vars cons = do
+makePrimForDI' rules mkInstance' isNewtype tyName vars cons = do
     -- variable parameters
     let vars' = map VarT (typeVars vars)
     -- Name of base functor
@@ -197,21 +294,23 @@ makePrimForDI' rules isNewtype tyName vars cons = do
     baseDec <- tySynInstDCompat baseTypeName Nothing
                                 [pure s] (pure $ conAppsT tyNameF vars')
 
+    let mkInstance :: Name -> [Dec] -> Dec
+        mkInstance = case mkInstance' of
+            Just f  -> f
+            Nothing -> \n -> 
+#if MIN_VERSION_template_haskell(2,11,0)
+                InstanceD Nothing [] (ConT n `AppT` s)
+#else
+                InstanceD [] (ConT n `AppT` s)
+#endif
+
     -- instance Recursive
     projDec <- FunD projectValName <$> mkMorphism id (_baseRulesCon rules) cons'
-#if MIN_VERSION_template_haskell(2,11,0)
-    let recursiveDec = InstanceD Nothing [] (ConT recursiveTypeName `AppT` s) [projDec]
-#else
-    let recursiveDec = InstanceD [] (ConT recursiveTypeName `AppT` s) [projDec]
-#endif
+    let recursiveDec = mkInstance recursiveTypeName [projDec]
 
     -- instance Corecursive
     embedDec <- FunD embedValName <$> mkMorphism (_baseRulesCon rules) id cons'
-#if MIN_VERSION_template_haskell(2,11,0)
-    let corecursiveDec = InstanceD Nothing [] (ConT corecursiveTypeName `AppT` s) [embedDec]
-#else
-    let corecursiveDec = InstanceD [] (ConT corecursiveTypeName `AppT` s) [embedDec]
-#endif
+    let corecursiveDec = mkInstance corecursiveTypeName [embedDec]
 
     -- Combine
     A.pure [dataDec, baseDec, recursiveDec, corecursiveDec]
@@ -276,6 +375,12 @@ over l f = runIdentity . l (Identity . f)
 -------------------------------------------------------------------------------
 -- Type mangling
 -------------------------------------------------------------------------------
+
+headOfType :: Type -> Q Name
+headOfType (AppT t _) = headOfType t
+headOfType (VarT n)   = return n
+headOfType (ConT n)   = return n
+headOfType t          = fail $ "headOfType: " ++ show t
 
 -- | Extract type variables
 typeVars :: [TyVarBndr] -> [Name]
