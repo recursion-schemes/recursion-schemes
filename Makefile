@@ -1,3 +1,5 @@
+.PHONY: all build doctest ghcid
+
 all : build
 
 build :
