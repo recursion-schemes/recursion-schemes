@@ -129,7 +129,7 @@ import           Data.Functor.Base hiding (head, tail)
 import qualified Data.Functor.Base as NEF (NonEmptyF(..))
 
 -- $setup
--- >>> :set -XDeriveFunctor -XScopedTypeVariables -XLambdaCase -XGADTs
+-- >>> :set -XDeriveFunctor -XScopedTypeVariables -XLambdaCase -XGADTs -XFlexibleContexts
 -- >>> import Control.Monad (void)
 -- >>> import Data.Char (toUpper)
 -- >>> import Data.Foldable (traverse_)
@@ -203,8 +203,8 @@ class Functor (Base t) => Recursive t where
   -- >>> showTree tree
   -- (a (b c d) e f)
   --
-  -- >>> traverse_ showTree $ para (\fun -> embed (fmap fst fun) : foldMap snd fun) tree
-  -- (a (b c d) e f)
+  -- >>> let children = para (foldMap (uncurry (:)))
+  -- >>> traverse_ showTree (children tree)
   -- (b c d)
   -- c
   -- d
