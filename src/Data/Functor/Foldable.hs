@@ -186,20 +186,6 @@ class Functor (Base t) => Recursive t where
   -- | A variant of 'cata' in which recursive positions also include the
   -- original sub-tree, in addition to the result of folding that sub-tree.
   --
-  -- A very simple example is collecting all recursive children of a value
-  --
-  -- >>> let tree = Node "a" [Node "b" [Node "c" [], Node "d" []], Node "e" [], Node "f" []]
-  -- >>> showTree tree
-  -- (a (b c d) e f)
-  --
-  -- >>> let children = para (foldMap (uncurry (:)))
-  -- >>> traverse_ showTree (children tree)
-  -- (b c d)
-  -- c
-  -- d
-  -- e
-  -- f
-  --
   para :: (Base t (t, a) -> a) -> t -> a
   para t = p where p x = t . fmap ((,) <*> p) $ project x
 
