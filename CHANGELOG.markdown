@@ -1,3 +1,29 @@
+## 5.2
+
+* Add instances for `Tree` (from `containers`)
+* Add some haddocks and basic examples
+* Generalize the type of `makeBaseFunctor(With)`, such that
+  it can take also `Dec`. This way you may supply context for `Recursive`
+  and `Corecursive` instances.
+
+## 5.1.3 [2019.04.26]
+* Support `th-abstraction-0.3.0.0` or later.
+
+## 5.1.2
+* Make the `Generic`-based instances to also support data constructors with zero
+  arguments (and datatypes with zero constructors).
+
+## 5.1.1.1
+
+* Invalid release
+
+## 5.1.1
+
+* Add `cotransverse`
+* Add `Generic` based default implementation to `embed` and `project`.
+  `Recursive` and `Corecursive` can be `DeriveAnyClass`-derived now,
+  if you write the base functor by hand.
+
 ## 5.1
 * Export gfutu
 * `distGHisto`, `ghisto`, and `gchrono` now use `Cofree (Base t)`

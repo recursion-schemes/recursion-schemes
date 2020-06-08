@@ -1,10 +1,12 @@
 {-# LANGUAGE TemplateHaskell, KindSignatures, TypeFamilies #-}
 {-# LANGUAGE DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
+{-# LANGUAGE DeriveGeneric #-}
 module Main where
 
 import Data.Functor.Foldable
 import Data.Functor.Foldable.TH
 import Language.Haskell.TH
+import GHC.Generics (Generic)
 import Data.List (foldl')
 import Test.HUnit
 import Data.Functor.Identity
@@ -26,6 +28,34 @@ makeBaseFunctorWith (runIdentity $ return baseRules
     >>= baseRulesCon (\_-> Identity $ mkName . (++ "'") . nameBase)
     >>= baseRulesType (\_ -> Identity $ mkName . (++ "_") . nameBase)
     ) ''Expr2
+
+data Expr3 a
+    = Unit3
+    | Lit3 a
+    | Add3 (Expr3 a) (Expr3 a)
+    | OpA (Expr3 a) (Expr3 a) Int
+    | OpB (Expr3 a) (Expr3 a) Char
+    | OpC (Expr3 a) (Expr3 a) Bool
+    | OpD (Expr3 a) (Expr3 a) Int
+    | OpE (Expr3 a) (Expr3 a) Char
+    | OpF (Expr3 a) (Expr3 a) Bool Bool Bool
+  deriving (Show, Generic)
+
+data Expr3F a b
+    = Unit3F
+    | Lit3F a
+    | Add3F b b
+    | OpAF b b Int
+    | OpBF b b Char
+    | OpCF b b Bool
+    | OpDF b b Int
+    | OpEF b b Char
+    | OpFF b b Bool Bool Bool
+  deriving (Show, Generic, Functor)
+
+type instance Base (Expr3 a) = (Expr3F a)
+instance Recursive (Expr3 a)
+instance Corecursive (Expr3 a)
 
 expr1 :: Expr Int
 expr1 = Add (Lit 2) (Lit 3 :* [Lit 4])

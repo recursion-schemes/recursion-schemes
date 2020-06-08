@@ -8,6 +8,7 @@
 #endif
 #if HAS_GENERIC
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE ScopedTypeVariables, DefaultSignatures, MultiParamTypeClasses, TypeOperators #-}
 #endif
 #endif
 
@@ -16,7 +17,9 @@
 -- Copyright   :  (C) 2008-2015 Edward Kmett
 -- License     :  BSD-style (see the file LICENSE)
 --
--- Maintainer  :  Edward Kmett <ekmett@gmail.com>
+-- Maintainer  : "Samuel Gélineau" <gelisam@gmail.com>,
+--               "Oleg Grenrus" <oleg.grenrus@iki.fi>,
+--               "Ryan Scott" <ryan.gl.scott@gmail.com>
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
@@ -26,10 +29,6 @@ module Data.Functor.Foldable
   -- * Base functors for fixed points
     Base
   , ListF(..)
-  -- * Fixed points
-  , Fix(..), unfix
-  , Mu(..), hoistMu
-  , Nu(..), hoistNu
   -- * Folding
   , Recursive(..)
   -- ** Combinators
@@ -83,6 +82,11 @@ module Data.Functor.Foldable
   -- * Effectful combinators
   , cataA
   , transverse
+  , cotransverse
+  -- * Fixed points
+  , Fix(..), unfix
+  , Mu(..), hoistMu
+  , Nu(..), hoistNu
   ) where
 
 import Control.Applicative
@@ -105,6 +109,7 @@ import Data.Function (on)
 import Data.Functor.Classes
 import Data.Functor.Compose (Compose(..))
 import Data.List.NonEmpty(NonEmpty((:|)), nonEmpty, toList)
+import Data.Tree (Tree (..))
 import Text.Read
 import Text.Show
 #ifdef __GLASGOW_HASKELL__
@@ -114,25 +119,24 @@ import Data.Data hiding (gunfold)
 import qualified Data.Data as Data
 #endif
 #if HAS_GENERIC
-import GHC.Generics (Generic)
-#endif
-#if HAS_GENERIC1
-import GHC.Generics (Generic1)
+import GHC.Generics (Generic (..), M1 (..), V1, U1, K1 (..), (:+:) (..), (:*:) (..))
 #endif
 #endif
 import Numeric.Natural
-import Data.Monoid (Monoid (..))
 import Prelude
-
-import qualified Data.Foldable as F
-import qualified Data.Traversable as T
-
-import qualified Data.Bifunctor as Bi
-import qualified Data.Bifoldable as Bi
-import qualified Data.Bitraversable as Bi
 
 import           Data.Functor.Base hiding (head, tail)
 import qualified Data.Functor.Base as NEF (NonEmptyF(..))
+
+-- $setup
+-- >>> :set -XDeriveFunctor -XScopedTypeVariables -XLambdaCase -XGADTs
+-- >>> import Control.Monad (void)
+-- >>> import Data.Char (toUpper)
+-- >>> import Data.Foldable (traverse_)
+-- >>> import Data.List (partition)
+-- >>> import Data.Maybe (maybeToList)
+--
+-- >>> let showTree = putStrLn . go where go (Node x xs) = if null xs then x else "(" ++ unwords (x : map go xs) ++ ")"
 
 -- | Obtain the base functor for a recursive datatype.
 --
@@ -141,19 +145,22 @@ import qualified Data.Functor.Base as NEF (NonEmptyF(..))
 -- related, non-recursive datatype we call the "base functor".
 --
 -- For example, @[a]@ is a recursive type, and its corresponding base functor is
--- @ListF a@:
+-- @'ListF' a@:
 --
--- > data ListF a b = Nil | Cons a b
--- > type instance Base [a] = ListF a
+-- @
+-- data 'ListF' a b = 'Nil' | 'Cons' a b
+-- type instance 'Base' [a] = 'ListF' a
+-- @
 --
 -- The relationship between those two types is that if we replace @b@ with
--- @ListF a@, we obtain a type which is isomorphic to @[a]@.
+-- @'ListF' a@, we obtain a type which is isomorphic to @[a]@.
+--
 type family Base t :: * -> *
 
 -- | A recursive datatype which can be unrolled one recursion layer at a time.
 --
--- For example, a value of type @[a]@ can be unrolled into a @ListF a [a]@. If
--- that unrolled value is a 'Cons', it contains another @[a]@ which can be
+-- For example, a value of type @[a]@ can be unrolled into a @'ListF' a [a]@.
+-- Ifthat unrolled value is a 'Cons', it contains another @[a]@ which can be
 -- unrolled as well, and so on.
 --
 -- Typically, 'Recursive' types also have a 'Corecursive' instance, in which
@@ -164,20 +171,24 @@ class Functor (Base t) => Recursive t where
   -- >>> project [1,2,3]
   -- Cons 1 [2,3]
   project :: t -> Base t t
+#ifdef HAS_GENERIC
+  default project :: (Generic t, Generic (Base t t), GCoerce (Rep t) (Rep (Base t t))) => t -> Base t t
+  project = to . gcoerce . from
+#endif
 
   -- | A generalization of 'foldr'. The elements of the base functor, called the
   -- "recursive positions", give the result of folding the sub-tree at that
   -- position.
   --
-  -- > -- |
-  -- > -- >>> sum [1,2,3]
-  -- > -- 6
-  -- > sum :: [Int] -> Int
-  -- > sum = cata sumF
-  -- >
-  -- > sumF :: ListF Int Int -> Int
-  -- > sumF Nil          = 0
-  -- > sumF (Cons x acc) = x + acc
+  -- >>> :{
+  -- >>> let oursum = cata $ \case
+  -- >>>        Nil        -> 0
+  -- >>>        Cons x acc -> x + acc
+  -- >>> :}
+  --
+  -- >>> oursum [1,2,3]
+  -- 6
+  --
   cata :: (Base t a -> a) -- ^ a (Base t)-algebra
        -> t               -- ^ fixed point
        -> a               -- ^ result
@@ -186,19 +197,20 @@ class Functor (Base t) => Recursive t where
   -- | A variant of 'cata' in which recursive positions also include the
   -- original sub-tree, in addition to the result of folding that sub-tree.
   --
-  -- Useful when matching on a pattern which spans more than one recursion step:
+  -- A very simple example is collecting all recursive children of a value
   --
-  -- > -- |
-  -- > -- >>> splitAtCommaSpace "one, two, three"
-  -- > -- Just ("one","two, three")
-  -- > splitAtCommaSpace :: String -> Maybe (String,String)
-  -- > splitAtCommaSpace = para splitAtCommaSpaceF
-  -- >
-  -- > splitAtCommaSpaceF :: ListF Char (String, Maybe (String,String))
-  -- >                    -> Maybe (String,String)
-  -- > splitAtCommaSpaceF (Cons ',' (' ':ys, _))     = Just ([], ys)
-  -- > splitAtCommaSpaceF (Cons x (_, Just (xs,ys))) = Just (x:xs, ys)
-  -- > splitAtCommaSpaceF _                          = Nothing
+  -- >>> let tree = Node "a" [Node "b" [Node "c" [], Node "d" []], Node "e" [], Node "f" []]
+  -- >>> showTree tree
+  -- (a (b c d) e f)
+  --
+  -- >>> traverse_ showTree $ para (\fun -> embed (fmap fst fun) : foldMap snd fun) tree
+  -- (a (b c d) e f)
+  -- (b c d)
+  -- c
+  -- d
+  -- e
+  -- f
+  --
   para :: (Base t (t, a) -> a) -> t -> a
   para t = p where p x = t . fmap ((,) <*> p) $ project x
 
@@ -336,30 +348,37 @@ distParaT t = distZygoT embed t
 
 -- | A recursive datatype which can be rolled up one recursion layer at a time.
 --
--- For example, a value of type @ListF a [a]@ can be rolled up into a @[a]@.
--- This @[a]@ can then be used in a 'Cons' to construct another @List F a [a]@,
+-- For example, a value of type @'ListF' a [a]@ can be rolled up into a @[a]@.
+-- This @[a]@ can then be used in a 'Cons' to construct another @'ListF' a [a]@,
 -- which can be rolled up as well, and so on.
 --
 -- Typically, 'Corecursive' types also have a 'Recursive' instance, in which
 -- case 'embed' and 'project' are inverses.
 class Functor (Base t) => Corecursive t where
+
   -- | Roll up a single recursion layer.
   --
   -- >>> embed (Cons 1 [2,3])
   -- [1,2,3]
   embed :: Base t t -> t
+#ifdef HAS_GENERIC
+  default embed :: (Generic t, Generic (Base t t), GCoerce (Rep (Base t t)) (Rep t)) => Base t t -> t
+  embed = to . gcoerce . from
+#endif
 
   -- | A generalization of 'unfoldr'. The starting seed is expanded into a base
   -- functor whose recursive positions contain more seeds, which are themselves
   -- expanded, and so on.
   --
-  -- > -- |
-  -- > -- >>> enumFromTo 1 4
-  -- > -- [1,2,3,4]
-  -- > enumFromTo :: Int -> Int -> [Int]
-  -- > enumFromTo lo hi = ana go lo where
-  -- >   go :: Int -> ListF Int Int
-  -- >   go i = if i > hi then Nil else Cons i (i+1)
+  -- >>> :{
+  -- >>> let ourEnumFromTo :: Int -> Int -> [Int]
+  -- >>>     ourEnumFromTo lo hi = ana go lo where
+  -- >>>         go i = if i > hi then Nil else Cons i (i + 1)
+  -- >>> :}
+  --
+  -- >>> ourEnumFromTo 1 4
+  -- [1,2,3,4]
+  --
   ana
     :: (a -> Base t a) -- ^ a (Base t)-coalgebra
     -> a               -- ^ seed
@@ -445,122 +464,38 @@ class Functor (Base t) => Corecursive t where
 --
 -- Useful when your recursion structure is shaped like a particular recursive
 -- datatype, but you're neither consuming nor producing that recursive datatype.
--- For example, the recursion structure of merge sort is a binary tree, but its
+-- For example, the recursion structure of quick sort is a binary tree, but its
 -- input and output is a list, not a binary tree.
 --
--- > -- |
--- > -- >>> sort [1,5,2,8,4,9,8]
--- > -- [1,2,4,5,8,8,9]
--- > sort :: [Int] -> [Int]
--- > sort = hylo merge split where
--- >   split :: [Int] -> TreeF Int [Int]
--- >   split [x] = Leaf x
--- >   split xs  = uncurry Branch $ splitAt (length xs `div` 2) xs
--- >
--- >   merge :: TreeF Int [Int] -> [Int]
--- >   merge (Leaf x)         = [x]
--- >   merge (Branch xs1 xs2) = mergeSortedLists xs1 xs2
+-- >>> data BinTreeF a b = Tip | Branch b a b deriving (Functor)
+--
+-- >>> :{
+-- >>> let quicksort :: Ord a => [a] -> [a]
+-- >>>     quicksort = hylo merge split where
+-- >>>         split []     = Tip
+-- >>>         split (x:xs) = let (l, r) = partition (<x) xs in Branch l x r
+-- >>>
+-- >>>         merge Tip            = []
+-- >>>         merge (Branch l x r) = l ++ [x] ++ r
+-- >>> :}
+--
+-- >>> quicksort [1,5,2,8,4,9,8]
+-- [1,2,4,5,8,8,9]
+--
 hylo :: Functor f => (f b -> b) -> (a -> f a) -> a -> b
 hylo f g = h where h = f . fmap h . g
 
--- | A friendlier name for 'cata'.
+-- | An alias for 'cata'.
 fold :: Recursive t => (Base t a -> a) -> t -> a
 fold = cata
 
--- | A friendlier name for 'ana'.
+-- | An alias for 'ana'.
 unfold :: Corecursive t => (a -> Base t a) -> a -> t
 unfold = ana
 
--- | A friendlier name for 'hylo'.
+-- | An alias for 'hylo'.
 refold :: Functor f => (f b -> b) -> (a -> f a) -> a -> b
 refold = hylo
-
--- | Base functor of @[a]@.
-data ListF a b = Nil | Cons a b
-  deriving (Eq,Ord,Show,Read,Typeable
-#if HAS_GENERIC
-          , Generic
-#endif
-#if HAS_GENERIC1
-          , Generic1
-#endif
-          )
-
-#ifdef LIFTED_FUNCTOR_CLASSES
-instance Eq2 ListF where
-  liftEq2 _ _ Nil        Nil          = True
-  liftEq2 f g (Cons a b) (Cons a' b') = f a a' && g b b'
-  liftEq2 _ _ _          _            = False
-
-instance Eq a => Eq1 (ListF a) where
-  liftEq = liftEq2 (==)
-
-instance Ord2 ListF where
-  liftCompare2 _ _ Nil        Nil          = EQ
-  liftCompare2 _ _ Nil        _            = LT
-  liftCompare2 _ _ _          Nil          = GT
-  liftCompare2 f g (Cons a b) (Cons a' b') = f a a' `mappend` g b b'
-
-instance Ord a => Ord1 (ListF a) where
-  liftCompare = liftCompare2 compare
-
-instance Show a => Show1 (ListF a) where
-  liftShowsPrec = liftShowsPrec2 showsPrec showList
-
-instance Show2 ListF where
-  liftShowsPrec2 _  _ _  _ _ Nil        = showString "Nil"
-  liftShowsPrec2 sa _ sb _ d (Cons a b) = showParen (d > 10)
-    $ showString "Cons "
-    . sa 11 a
-    . showString " "
-    . sb 11 b
-
-instance Read2 ListF where
-  liftReadsPrec2 ra _ rb _ d = readParen (d > 10) $ \s -> nil s ++ cons s
-    where
-      nil s0 = do
-        ("Nil", s1) <- lex s0
-        return (Nil, s1)
-      cons s0 = do
-        ("Cons", s1) <- lex s0
-        (a,      s2) <- ra 11 s1
-        (b,      s3) <- rb 11 s2
-        return (Cons a b, s3)
-
-instance Read a => Read1 (ListF a) where
-  liftReadsPrec = liftReadsPrec2 readsPrec readList
-
-#else
-instance Eq a   => Eq1   (ListF a) where eq1        = (==)
-instance Ord a  => Ord1  (ListF a) where compare1   = compare
-instance Show a => Show1 (ListF a) where showsPrec1 = showsPrec
-instance Read a => Read1 (ListF a) where readsPrec1 = readsPrec
-#endif
-
--- These instances cannot be auto-derived on with GHC <= 7.6
-instance Functor (ListF a) where
-  fmap _ Nil        = Nil
-  fmap f (Cons a b) = Cons a (f b)
-
-instance F.Foldable (ListF a) where
-  foldMap _ Nil        = Data.Monoid.mempty
-  foldMap f (Cons _ b) = f b
-
-instance T.Traversable (ListF a) where
-  traverse _ Nil        = pure Nil
-  traverse f (Cons a b) = Cons a <$> f b
-
-instance Bi.Bifunctor ListF where
-  bimap _ _ Nil        = Nil
-  bimap f g (Cons a b) = Cons (f a) (g b)
-
-instance Bi.Bifoldable ListF where
-  bifoldMap _ _ Nil        = mempty
-  bifoldMap f g (Cons a b) = mappend (f a) (g b)
-
-instance Bi.Bitraversable ListF where
-  bitraverse _ _ Nil        = pure Nil
-  bitraverse f g (Cons a b) = Cons <$> f a <*> g b
 
 type instance Base [a] = ListF a
 instance Recursive [a] where
@@ -584,6 +519,12 @@ instance Recursive (NonEmpty a) where
   project (x:|xs) = NonEmptyF x $ nonEmpty xs
 instance Corecursive (NonEmpty a) where
   embed = (:|) <$> NEF.head <*> (maybe [] toList <$> NEF.tail)
+
+type instance Base (Tree a) = TreeF a
+instance Recursive (Tree a) where
+  project (Node x xs) = NodeF x xs
+instance Corecursive (Tree a) where
+  embed (NodeF x xs) = Node x xs
 
 type instance Base Natural = Maybe
 instance Recursive Natural where
@@ -764,8 +705,9 @@ grefold, ghylo
   -> (a -> f (m a))
   -> a
   -> b
-ghylo w m f g = extract . h . return where
-  h = fmap f . w . fmap (duplicate . h . join) . m . liftM g
+ghylo w m f g = f . fmap (hylo alg coalg) . g where
+  coalg = fmap join . m . liftM g
+  alg   = fmap f . w . fmap duplicate
 grefold w m f g a = ghylo w m f g a
 
 -- | A variant of 'ana' in which more than one recursive layer can be generated
@@ -878,13 +820,20 @@ instance Functor f => Recursive (Fix f) where
 instance Functor f => Corecursive (Fix f) where
   embed = Fix
 
+-- | Convert from one recursive type to another.
+--
+-- >>> showTree $ hoist (\(NonEmptyF h t) -> NodeF [h] (maybeToList t)) ( 'a' :| "bcd")
+-- (a (b (c d)))
+--
 hoist :: (Recursive s, Corecursive t)
       => (forall a. Base s a -> Base t a) -> s -> t
 hoist n = cata (embed . n)
 
--- |
+-- | Convert from one recursive representation to another.
+--
 -- >>> refix ["foo", "bar"] :: Fix (ListF String)
 -- Fix (Cons "foo" (Fix (Cons "bar" (Fix Nil))))
+--
 refix :: (Recursive s, Corecursive t, Base s ~ Base t) => s -> t
 refix = cata embed
 
@@ -1439,17 +1388,76 @@ transverse :: (Recursive s, Corecursive t, Functor f)
            => (forall a. Base s (f a) -> f (Base t a)) -> s -> f t
 transverse n = cata (fmap embed . n)
 
+-- | A coeffectful version of 'hoist'.
+--
+-- Properties:
+--
+-- @
+-- 'cotransverse' 'distAna' = 'runIdentity'
+-- @
+--
+-- Examples:
+--
+-- Stateful transformations:
+--
+-- >>> :{
+-- cotransverse
+--   (\(u, b) -> case b of
+--     Nil -> Nil
+--     Cons x a -> Cons (if u then toUpper x else x) (not u, a))
+--   (True, "foobar") :: String
+-- :}
+-- "FoObAr"
+--
+-- We can implement a variant of `zipWith`
+--
+-- >>> data Pair a = Pair a a deriving Functor
+--
+-- >>> :{
+-- let zipWith' :: forall a b. (a -> a -> b) -> [a] -> [a] -> [b]
+--     zipWith' f xs ys = cotransverse g (Pair xs ys) where
+--       g :: Pair (ListF a c) -> ListF b (Pair c)
+--       g (Pair Nil        _)          = Nil
+--       g (Pair _          Nil)        = Nil
+--       g (Pair (Cons x a) (Cons y b)) = Cons (f x y) (Pair a b)
+--     :}
+--
+-- >>> zipWith' (*) [1,2,3] [4,5,6]
+-- [4,10,18]
+--
+-- >>> zipWith' (*) [1,2,3] [4,5,6,8]
+-- [4,10,18]
+--
+-- >>> zipWith' (*) [1,2,3,3] [4,5,6]
+-- [4,10,18]
+--
+cotransverse :: (Recursive s, Corecursive t, Functor f)
+             => (forall a. f (Base s a) -> Base t (f a)) -> f s -> t
+cotransverse n = ana (n . fmap project)
+
 -------------------------------------------------------------------------------
--- Not exposed anywhere
+-- GCoerce
 -------------------------------------------------------------------------------
 
--- | Read a list (using square brackets and commas), given a function
--- for reading elements.
-_readListWith :: ReadS a -> ReadS [a]
-_readListWith rp =
-    readParen False (\r -> [pr | ("[",s) <- lex r, pr <- readl s])
-  where
-    readl s = [([],t) | ("]",t) <- lex s] ++
-        [(x:xs,u) | (x,t) <- rp s, (xs,u) <- readl' t]
-    readl' s = [([],t) | ("]",t) <- lex s] ++
-        [(x:xs,v) | (",",t) <- lex s, (x,u) <- rp t, (xs,v) <- readl' u]
+class GCoerce f g where
+    gcoerce :: f a -> g a
+
+instance GCoerce f g => GCoerce (M1 i c f) (M1 i c' g) where
+    gcoerce (M1 x) = M1 (gcoerce x)
+
+-- R changes to/from P with GHC-7.4.2 at least.
+instance GCoerce (K1 i c) (K1 j c) where
+    gcoerce = K1 . unK1
+
+instance GCoerce U1 U1 where
+    gcoerce = id
+
+instance GCoerce V1 V1 where
+    gcoerce = id
+
+instance (GCoerce f g, GCoerce f' g') => GCoerce (f :*: f') (g :*: g') where
+    gcoerce (x :*: y) = gcoerce x :*: gcoerce y
+
+instance (GCoerce f g, GCoerce f' g') => GCoerce (f :+: f') (g :+: g') where
+    gcoerce (L1 x) = L1 (gcoerce x)
+    gcoerce (R1 x) = R1 (gcoerce x)

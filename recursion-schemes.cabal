@@ -1,22 +1,21 @@
 name:          recursion-schemes
 category:      Control, Recursion
-version:       5.1
-license:       BSD3
+version:       5.2
+license:       BSD2
 cabal-version: >= 1.8
 license-file:  LICENSE
 author:        Edward A. Kmett
-maintainer:    Edward A. Kmett <ekmett@gmail.com>
+maintainer:    "Samuel Gélineau" <gelisam@gmail.com>,
+               "Oleg Grenrus" <oleg.grenrus@iki.fi>,
+               "Ryan Scott" <ryan.gl.scott@gmail.com>
 stability:     provisional
 homepage:      http://github.com/ekmett/recursion-schemes/
 bug-reports:   http://github.com/ekmett/recursion-schemes/issues
 copyright:     Copyright (C) 2008-2015 Edward A. Kmett
-synopsis:      Generalized bananas, lenses and barbed wire
-description:
-  Recursion operators, see
-  "Generalized bananas, lenses and barbed wire"
-  by Erik Meijer, Maarten Fokkinga and Ross Paterson.
+synopsis:      Representing common recursion patterns as higher-order functions
+description:   Many recursive functions share the same structure, e.g. pattern-match on the input and, depending on the data constructor, either recur on a smaller input or terminate the recursion with the base case. Another one: start with a seed value, use it to produce the first element of an infinite list, and recur on a modified seed in order to produce the rest of the list. Such a structure is called a recursion scheme. Using higher-order functions to implement those recursion schemes makes your code clearer, faster, and safer. See README for details.
 
-tested-with:   GHC==7.4.2, GHC==7.6.3, GHC==7.8.4, GHC==7.10.3, GHC==8.0.2, GHC==8.2.2, GHC==8.4.4, GHC==8.6.3
+tested-with:   GHC==7.4.2, GHC==7.6.3, GHC==7.8.4, GHC==7.10.3, GHC==8.0.2, GHC==8.2.2, GHC==8.4.4, GHC==8.6.5, GHC==8.8.3, GHC==8.10.1
 
 build-type:    Simple
 extra-source-files: .travis.yml CHANGELOG.markdown .gitignore README.markdown include/recursion-schemes-common.h
@@ -41,11 +40,13 @@ library
     StandaloneDeriving
     UndecidableInstances
 
+  hs-source-dirs: src
   include-dirs: include
   -- includes: recursion-schemes-common.h
 
   build-depends:
     base                 >= 4.5     && < 5,
+    containers           >= 0.4.2.1 && < 0.7,
     comonad              >= 4       && < 6,
     free                 >= 4       && < 6,
     transformers         >= 0.3.0.0 && < 1
@@ -73,15 +74,16 @@ library
       nats,
       transformers-compat  >= 0.3     && < 1
 
+  -- Foldable module is first, so cabal repl loads it!
   exposed-modules:
-    Data.Functor.Base
     Data.Functor.Foldable
+    Data.Functor.Base
 
   if flag(template-haskell)
     build-depends:
-      template-haskell >= 2.5.0.0 && < 2.15,
+      template-haskell >= 2.5.0.0 && < 2.17,
       base-orphans     >= 0.5.4   && < 0.9,
-      th-abstraction   >= 0.2.4   && < 0.3
+      th-abstraction   >= 0.3     && < 0.4
     exposed-modules:
       Data.Functor.Foldable.TH
 
@@ -101,3 +103,5 @@ test-suite Expr
     recursion-schemes,
     template-haskell,
     transformers     >= 0.2     && < 1
+  if impl(ghc < 7.5)
+    build-depends: ghc-prim
