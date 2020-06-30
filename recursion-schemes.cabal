@@ -2,7 +2,7 @@ name:          recursion-schemes
 category:      Control, Recursion
 version:       5.2
 license:       BSD2
-cabal-version: >= 1.8
+cabal-version: >= 1.10
 license-file:  LICENSE
 author:        Edward A. Kmett
 maintainer:    "Samuel Gélineau" <gelisam@gmail.com>,
@@ -91,12 +91,14 @@ library
       Paths_recursion_schemes
 
   ghc-options: -Wall
+  default-language: Haskell2010
 
 test-suite Expr
   type: exitcode-stdio-1.0
   main-is: Expr.hs
   hs-source-dirs: examples
   ghc-options: -Wall -threaded
+  default-language: Haskell2010
   build-depends:
     base,
     HUnit <1.7,
