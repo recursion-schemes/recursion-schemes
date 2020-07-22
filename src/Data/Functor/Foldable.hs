@@ -83,10 +83,6 @@ module Data.Functor.Foldable
   , cataA
   , transverse
   , cotransverse
-  -- * Fixed points
-  , Fix(..), unfix
-  , Mu(..), hoistMu
-  , Nu(..), hoistNu
   ) where
 
 import Control.Applicative
@@ -105,19 +101,10 @@ import           Control.Monad.Trans.Free (FreeF, FreeT(..))
 import qualified Control.Monad.Trans.Free as CMTF
 import Data.Functor.Identity
 import Control.Arrow
-import Data.Function (on)
-import Data.Functor.Classes
 import Data.Functor.Compose (Compose(..))
 import Data.List.NonEmpty(NonEmpty((:|)), nonEmpty, toList)
 import Data.Tree (Tree (..))
-import Text.Read
-import Text.Show
 #ifdef __GLASGOW_HASKELL__
-import Data.Data hiding (gunfold)
-#if HAS_POLY_TYPEABLE
-#else
-import qualified Data.Data as Data
-#endif
 #if HAS_GENERIC
 import GHC.Generics (Generic (..), M1 (..), V1, U1, K1 (..), (:+:) (..), (:*:) (..))
 #endif
@@ -127,6 +114,8 @@ import Prelude
 
 import           Data.Functor.Base hiding (head, tail)
 import qualified Data.Functor.Base as NEF (NonEmptyF(..))
+
+import Data.Fix (Fix (..), unFix, Mu (..), Nu (..))
 
 -- $setup
 -- >>> :set -XDeriveFunctor -XScopedTypeVariables -XLambdaCase -XGADTs -XFlexibleContexts
@@ -494,62 +483,6 @@ distGFutu k = d where
 -- Fix
 -------------------------------------------------------------------------------
 
-newtype Fix f = Fix (f (Fix f))
-
-unfix :: Fix f -> f (Fix f)
-unfix (Fix f) = f
-
-instance Eq1 f => Eq (Fix f) where
-  Fix a == Fix b = eq1 a b
-
-instance Ord1 f => Ord (Fix f) where
-  compare (Fix a) (Fix b) = compare1 a b
-
-instance Show1 f => Show (Fix f) where
-  showsPrec d (Fix a) =
-    showParen (d >= 11)
-      $ showString "Fix "
-      . showsPrec1 11 a
-
-instance Read1 f => Read (Fix f) where
-  readPrec = parens $ prec 10 $ do
-    Ident "Fix" <- lexP
-    Fix <$> step (readS_to_Prec readsPrec1)
-
-#ifdef __GLASGOW_HASKELL__
-#if HAS_POLY_TYPEABLE
-deriving instance Typeable Fix
-deriving instance (Typeable f, Data (f (Fix f))) => Data (Fix f)
-#else
-instance Typeable1 f => Typeable (Fix f) where
-   typeOf t = mkTyConApp fixTyCon [typeOf1 (undefined `asArgsTypeOf` t)]
-     where asArgsTypeOf :: f a -> Fix f -> f a
-           asArgsTypeOf = const
-
-fixTyCon :: TyCon
-#if MIN_VERSION_base(4,4,0)
-fixTyCon = mkTyCon3 "recursion-schemes" "Data.Functor.Foldable" "Fix"
-#else
-fixTyCon = mkTyCon "Data.Functor.Foldable.Fix"
-#endif
-{-# NOINLINE fixTyCon #-}
-
-instance (Typeable1 f, Data (f (Fix f))) => Data (Fix f) where
-  gfoldl f z (Fix a) = z Fix `f` a
-  toConstr _ = fixConstr
-  gunfold k z c = case constrIndex c of
-    1 -> k (z (Fix))
-    _ -> error "gunfold"
-  dataTypeOf _ = fixDataType
-
-fixConstr :: Constr
-fixConstr = mkConstr fixDataType "Fix" [] Prefix
-
-fixDataType :: DataType
-fixDataType = mkDataType "Data.Functor.Foldable.Fix" [fixConstr]
-#endif
-#endif
-
 type instance Base (Fix f) = f
 instance Functor f => Recursive (Fix f) where
   project (Fix a) = a
@@ -573,13 +506,6 @@ hoist n = cata (embed . n)
 refix :: (Recursive s, Corecursive t, Base s ~ Base t) => s -> t
 refix = cata embed
 
-toFix :: Recursive t => t -> Fix (Base t)
-toFix = refix
-
-fromFix :: Corecursive t => Fix (Base t) -> t
-fromFix = refix
-
-
 -------------------------------------------------------------------------------
 -- Lambek
 -------------------------------------------------------------------------------
@@ -592,7 +518,6 @@ lambek = cata (fmap embed)
 colambek :: (Recursive t, Corecursive t) => (Base t t -> t)
 colambek = ana (fmap project)
 
-newtype Mu f = Mu (forall a. (f a -> a) -> a)
 type instance Base (Mu f) = f
 instance Functor f => Recursive (Mu f) where
   project = lambek
@@ -600,27 +525,12 @@ instance Functor f => Recursive (Mu f) where
 instance Functor f => Corecursive (Mu f) where
   embed m = Mu (\f -> f (fmap (fold f) m))
 
-instance (Functor f, Eq1 f) => Eq (Mu f) where
-  (==) = (==) `on` toFix
-
-instance (Functor f, Ord1 f) => Ord (Mu f) where
-  compare = compare `on` toFix
-
-instance (Functor f, Show1 f) => Show (Mu f) where
-  showsPrec d f = showParen (d > 10) $
-    showString "fromFix " . showsPrec 11 (toFix f)
-
-#ifdef __GLASGOW_HASKELL__
-instance (Functor f, Read1 f) => Read (Mu f) where
-  readPrec = parens $ prec 10 $ do
-    Ident "fromFix" <- lexP
-    fromFix <$> step readPrec
-#endif
-
--- | A specialized, faster version of 'hoist' for 'Mu'.
-hoistMu :: (forall a. f a -> g a) -> Mu f -> Mu g
-hoistMu n (Mu mk) = Mu $ \roll -> mk (roll . n)
-
+type instance Base (Nu f) = f
+instance Functor f => Corecursive (Nu f) where
+  embed = colambek
+  ana = Nu
+instance Functor f => Recursive (Nu f) where
+  project (Nu f a) = Nu f <$> f a
 
 -- | Church encoded free monads are Recursive/Corecursive, in the same way that
 -- 'Mu' is.
@@ -633,37 +543,6 @@ instance Functor f => Recursive (CMFC.F f a) where
 instance Functor f => Corecursive (CMFC.F f a) where
   embed (CMTF.Pure a)  = CMFC.F $ \p _ -> p a
   embed (CMTF.Free fr) = CMFC.F $ \p f -> f $ fmap (cmfcCata p f) fr
-
-
-data Nu f where Nu :: (a -> f a) -> a -> Nu f
-type instance Base (Nu f) = f
-instance Functor f => Corecursive (Nu f) where
-  embed = colambek
-  ana = Nu
-instance Functor f => Recursive (Nu f) where
-  project (Nu f a) = Nu f <$> f a
-
-instance (Functor f, Eq1 f) => Eq (Nu f) where
-  (==) = (==) `on` toFix
-
-instance (Functor f, Ord1 f) => Ord (Nu f) where
-  compare = compare `on` toFix
-
-instance (Functor f, Show1 f) => Show (Nu f) where
-  showsPrec d f = showParen (d > 10) $
-    showString "fromFix " . showsPrec 11 (toFix f)
-
-#ifdef __GLASGOW_HASKELL__
-instance (Functor f, Read1 f) => Read (Nu f) where
-  readPrec = parens $ prec 10 $ do
-    Ident "fromFix" <- lexP
-    fromFix <$> step readPrec
-#endif
-
--- | A specialized, faster version of 'hoist' for 'Nu'.
-hoistNu :: (forall a. f a -> g a) -> Nu f -> Nu g
-hoistNu n (Nu next seed) = Nu (n . next) seed
-
 
 zygo :: Recursive t => (Base t b -> b) -> (Base t (b, a) -> a) -> t -> a
 zygo f = gfold (distZygo f)
@@ -733,11 +612,11 @@ gchrono w m = ghylo (distGHisto w) (distGFutu m)
 
 -- | Mendler-style iteration
 mcata :: (forall y. (y -> c) -> f y -> c) -> Fix f -> c
-mcata psi = psi (mcata psi) . unfix
+mcata psi = psi (mcata psi) . unFix
 
 -- | Mendler-style course-of-value iteration
 mhisto :: (forall y. (y -> c) -> (y -> f y) -> f y -> c) -> Fix f -> c
-mhisto psi = psi (mhisto psi) unfix . unfix
+mhisto psi = psi (mhisto psi) unFix . unFix
 
 -- | Elgot algebras
 elgot :: Functor f => (f a -> a) -> (b -> Either a (f b)) -> b -> a
