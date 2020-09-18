@@ -79,6 +79,7 @@ library
   exposed-modules:
     Data.Functor.Foldable
     Data.Functor.Base
+    RecursionSchemes
 
   if flag(template-haskell)
     build-depends:
