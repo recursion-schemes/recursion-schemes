@@ -1,5 +1,5 @@
 {-# LANGUAGE AllowAmbiguousTypes, DataKinds, FlexibleInstances, FunctionalDependencies, GADTs, RankNTypes, ScopedTypeVariables, TypeApplications, TypeFamilies, UndecidableInstances #-}
-module RecursionSchemes.Internal where
+module RecursionSchemes.Custom where
 
 import Control.Comonad.Cofree (Cofree((:<)))
 import GHC.TypeLits

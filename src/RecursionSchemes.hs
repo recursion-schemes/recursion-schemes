@@ -9,4 +9,4 @@ module RecursionSchemes
 
 import Control.Comonad.Cofree
 import Data.Functor.Foldable hiding (cata, para, zygo, histo)
-import RecursionSchemes.Internal
+import RecursionSchemes.Custom

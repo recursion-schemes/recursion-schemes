@@ -80,7 +80,7 @@ library
     Data.Functor.Foldable
     Data.Functor.Base
     RecursionSchemes
-    RecursionSchemes.Internal
+    RecursionSchemes.Custom
 
   if flag(template-haskell)
     build-depends:
