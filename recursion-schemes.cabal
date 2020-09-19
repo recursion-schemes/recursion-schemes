@@ -82,6 +82,8 @@ library
     RecursionSchemes
     RecursionSchemes.Custom.Gather
     RecursionSchemes.Custom.Scatter
+    RecursionSchemes.Internal.Gather
+    RecursionSchemes.Internal.Scatter
 
   if flag(template-haskell)
     build-depends:
