@@ -1,8 +1,9 @@
 {-# LANGUAGE AllowAmbiguousTypes, DataKinds, FlexibleInstances, FunctionalDependencies, GADTs, RankNTypes, ScopedTypeVariables, TypeApplications, TypeFamilies, UndecidableInstances #-}
-module RecursionSchemes.Custom where
+module RecursionSchemes.Custom.Gather where
 
 import Control.Comonad.Cofree (Cofree((:<)))
 import GHC.TypeLits
+
 import qualified Data.Functor.Foldable as F
 
 
@@ -30,14 +31,14 @@ recFun gather f
   = RecFun $ \ps -> gather (f ps) ps
 
 
-class PosTrans f where
+class PosUntrans f where
   untransformed :: f pos -> pos
 
 
 class Recur a pos | pos -> a where
   recur :: pos -> a
 
-instance {-# OVERLAPPABLE #-} (PosTrans f, Recur a pos) => Recur a (f pos) where
+instance {-# OVERLAPPABLE #-} (PosUntrans f, Recur a pos) => Recur a (f pos) where
   recur = recur . untransformed
 
 newtype CataPos a = CataPos
@@ -54,7 +55,7 @@ cata a _
 class Untouched t pos | pos -> t where
   untouched :: pos -> t
 
-instance {-# OVERLAPPABLE #-} (PosTrans f, Untouched t pos) => Untouched t (f pos) where
+instance {-# OVERLAPPABLE #-} (PosUntrans f, Untouched t pos) => Untouched t (f pos) where
   untouched = untouched . untransformed
 
 data ParaPosT t pos = ParaPosT
@@ -65,7 +66,7 @@ data ParaPosT t pos = ParaPosT
 instance Untouched t (ParaPosT t pos) where
   untouched = paraUntouched
 
-instance PosTrans (ParaPosT t) where
+instance PosUntrans (ParaPosT t) where
   untransformed = paraUntransformed
 
 paraT
@@ -87,7 +88,7 @@ para
 class Fast (s :: Symbol) b pos | pos -> b where
   fast :: pos -> b
 
-instance {-# OVERLAPPABLE #-} (PosTrans f, Fast s b pos) => Fast s b (f pos) where
+instance {-# OVERLAPPABLE #-} (PosUntrans f, Fast s b pos) => Fast s b (f pos) where
   fast = fast @s . untransformed
 
 data ZygoPosT (s :: Symbol) posB pos = ZygoPosT
@@ -98,7 +99,7 @@ data ZygoPosT (s :: Symbol) posB pos = ZygoPosT
 instance Recur b posB => Fast s b (ZygoPosT s posB pos) where
   fast = recur . zygoFast
 
-instance PosTrans (ZygoPosT s posB) where
+instance PosUntrans (ZygoPosT s posB) where
   untransformed = zygoUntransformed
 
 withZygotizedRecFun
@@ -134,7 +135,7 @@ type instance F.Base (HistoPosT base pos) = base
 instance Functor base => F.Recursive (HistoPosT base pos) where
   project (HistoPosT (_ :< ps)) = fmap HistoPosT ps
 
-instance PosTrans (HistoPosT base) where
+instance PosUntrans (HistoPosT base) where
   untransformed (HistoPosT (pos :< _)) = pos
 
 histoT
