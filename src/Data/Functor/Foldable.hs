@@ -73,6 +73,8 @@ module Data.Functor.Foldable
   , refold, grefold
   -- * Mendler-style
   , mcata
+  , mpara
+  , mzygo
   , mhisto
   , mana
   , mapo
@@ -602,6 +604,14 @@ gchrono w m = ghylo (distGHisto w) (distGFutu m)
 -- | Mendler-style iteration
 mcata :: (forall y. (y -> c) -> f y -> c) -> Fix f -> c
 mcata psi = c where c = psi c . unFix
+
+-- | Mendler-style version of 'para'
+mpara :: (forall y. (y -> c) -> (y -> Fix f) -> f y -> c) -> Fix f -> c
+mpara psi = c where c = psi c id . unFix
+
+-- | Mendler-style version of 'zygo'
+mzygo :: (forall y. (y -> b) -> f y -> b) -> (forall y. (y -> c) -> (y -> b) -> f y -> c) -> Fix f -> c
+mzygo phi psi = c where c = psi c (mcata phi) . unFix
 
 -- | Mendler-style course-of-value iteration
 mhisto :: (forall y. (y -> c) -> (y -> f y) -> f y -> c) -> Fix f -> c
