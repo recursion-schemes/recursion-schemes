@@ -605,11 +605,15 @@ gchrono w m = ghylo (distGHisto w) (distGFutu m)
 mcata :: (forall y. (y -> c) -> f y -> c) -> Fix f -> c
 mcata psi = c where c = psi c . unFix
 
--- | Mendler-style version of 'para'
+-- | Mendler-style recursion
+--
+-- @since 5.2.1
 mpara :: (forall y. (y -> c) -> (y -> Fix f) -> f y -> c) -> Fix f -> c
 mpara psi = c where c = psi c id . unFix
 
--- | Mendler-style version of 'zygo'
+-- | Mendler-style semi-mutual recursion
+--
+-- @since 5.2.1
 mzygo :: (forall y. (y -> b) -> f y -> b) -> (forall y. (y -> c) -> (y -> b) -> f y -> c) -> Fix f -> c
 mzygo phi psi = c where c = psi c (mcata phi) . unFix
 
