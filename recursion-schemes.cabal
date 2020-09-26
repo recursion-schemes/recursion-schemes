@@ -84,6 +84,7 @@ library
   if impl(ghc >= 8.0)
     exposed-modules:
       RecursionSchemes
+      RecursionSchemes.Hylo
       RecursionSchemes.Custom.Gather
       RecursionSchemes.Custom.Scatter
       RecursionSchemes.Internal.Gather
