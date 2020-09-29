@@ -1,7 +1,7 @@
 module RecursionSchemes
   ( Base, ListF(..), Recursive(project), Corecursive(embed)
 
-  , RecFun, runRecFun, recFun
+  , RecFun, runRecFun, recFun, traceRecFun
   , Recur(..), CataPos, cata
   , Untouched(..), ParaPosT, paraT, para
   , Fast(..), ZygoPosT, withZygotizedRecFun, zygoT, zygo
