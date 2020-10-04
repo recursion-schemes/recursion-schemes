@@ -14,6 +14,7 @@ import Data.Traversable as T
 import Data.Functor.Identity
 import Language.Haskell.TH
 import Language.Haskell.TH.Datatype as TH.Abs
+import Language.Haskell.TH.Datatype.TyVarBndr
 import Language.Haskell.TH.Syntax (mkNameG_tc, mkNameG_v)
 import Data.Char (GeneralCategory (..), generalCategory)
 import Data.Orphans ()
@@ -231,14 +232,14 @@ makePrimForDI rules mkInstance'
                           Datatype        -> False
                           Newtype         -> False
 
-    toTyVarBndr :: Type -> TyVarBndr
-    toTyVarBndr (VarT n)          = PlainTV n
-    toTyVarBndr (SigT (VarT n) k) = KindedTV n k
+    toTyVarBndr :: Type -> TyVarBndrUnit
+    toTyVarBndr (VarT n)          = plainTV n
+    toTyVarBndr (SigT (VarT n) k) = kindedTV n k
     toTyVarBndr _                 = error "toTyVarBndr"
 
 makePrimForDI' :: BaseRules
                -> Maybe (Name -> [Dec] -> Dec) -- ^ make instance
-               -> Bool -> Name -> [TyVarBndr]
+               -> Bool -> Name -> [TyVarBndrUnit]
                -> [ConstructorInfo] -> DecsQ
 makePrimForDI' rules mkInstance' isNewtype tyName vars cons = do
     -- variable parameters
@@ -251,7 +252,7 @@ makePrimForDI' rules mkInstance' isNewtype tyName vars cons = do
     rName <- newName "r"
     let r = VarT rName
     -- Vars
-    let varsF = vars ++ [PlainTV rName]
+    let varsF = vars ++ [plainTV rName]
 
     -- #33
     cons' <- traverse (conTypeTraversal resolveTypeSynonyms) cons
@@ -297,7 +298,7 @@ makePrimForDI' rules mkInstance' isNewtype tyName vars cons = do
     let mkInstance :: Name -> [Dec] -> Dec
         mkInstance = case mkInstance' of
             Just f  -> f
-            Nothing -> \n -> 
+            Nothing -> \n ->
 #if MIN_VERSION_template_haskell(2,11,0)
                 InstanceD Nothing [] (ConT n `AppT` s)
 #else
@@ -383,7 +384,7 @@ headOfType (ConT n)   = return n
 headOfType t          = fail $ "headOfType: " ++ show t
 
 -- | Extract type variables
-typeVars :: [TyVarBndr] -> [Name]
+typeVars :: [TyVarBndr_ flag] -> [Name]
 typeVars = map tvName
 
 -- | Apply arguments to a type constructor.
