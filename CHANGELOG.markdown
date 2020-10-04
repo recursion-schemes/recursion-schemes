@@ -1,3 +1,6 @@
+## 5.2.1 [2020.10.04]
+* Allow building with `template-haskell-2.17.0.0` (GHC 9.0).
+
 ## 5.2
 
 * Add instances for `Tree` (from `containers`)
