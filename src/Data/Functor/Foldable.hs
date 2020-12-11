@@ -73,7 +73,12 @@ module Data.Functor.Foldable
   , refold, grefold
   -- * Mendler-style
   , mcata
+  , mpara
+  , mzygo
   , mhisto
+  , mana
+  , mapo
+  , mfutu
   -- * Elgot (co)algebras
   , elgot
   , coelgot
@@ -598,11 +603,41 @@ gchrono w m = ghylo (distGHisto w) (distGFutu m)
 
 -- | Mendler-style iteration
 mcata :: (forall y. (y -> c) -> f y -> c) -> Fix f -> c
-mcata psi = psi (mcata psi) . unFix
+mcata psi = c where c = psi c . unFix
+
+-- | Mendler-style recursion
+--
+-- @since 5.2.1
+mpara :: (forall y. (y -> c) -> (y -> Fix f) -> f y -> c) -> Fix f -> c
+mpara psi = c where c = psi c id . unFix
+
+-- | Mendler-style semi-mutual recursion
+--
+-- @since 5.2.1
+mzygo :: (forall y. (y -> b) -> f y -> b) -> (forall y. (y -> c) -> (y -> b) -> f y -> c) -> Fix f -> c
+mzygo phi psi = c where c = psi c (mcata phi) . unFix
 
 -- | Mendler-style course-of-value iteration
 mhisto :: (forall y. (y -> c) -> (y -> f y) -> f y -> c) -> Fix f -> c
-mhisto psi = psi (mhisto psi) unFix . unFix
+mhisto psi = c where c = psi c unFix . unFix
+
+-- | Mendler-style coiteration
+--
+-- @since 5.2.1
+mana :: (forall y. (x -> y) -> x -> f y) -> x -> Fix f
+mana phi = c where c = Fix . phi c
+
+-- | Mendler-style corecursion
+--
+-- @since 5.2.1
+mapo :: (forall y. (Fix f -> y) -> (x -> y) -> x -> f y) -> x -> Fix f
+mapo phi = c where c = Fix . phi id c
+
+-- | Mendler-style course-of-values coiteration
+--
+-- @since 5.2.1
+mfutu :: (forall y. (f y -> y) -> (x -> y) -> x -> f y) -> x -> Fix f
+mfutu phi = c where c = Fix . phi Fix c
 
 -- | Elgot algebras
 elgot :: Functor f => (f a -> a) -> (b -> Either a (f b)) -> b -> a
