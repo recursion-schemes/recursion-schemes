@@ -1,5 +1,6 @@
 no-tests-no-benchmarks: False
 unconstrained:          False
-doctest:                True
-doctest-options:        -DCURRENT_PACKAGE_KEY='"recursion-schemes"' -this-unit-id recursion-schemes
+-- AMP, extensions, etc make it harder to run with older GHCs
+docspec:                >=7.10
 irc-channels:           irc.freenode.org#haskell-lens
+irc-if-in-origin-repo:  True
