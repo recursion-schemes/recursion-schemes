@@ -1,6 +1,6 @@
 # recursion-schemes
 
-[![Hackage](https://img.shields.io/hackage/v/recursion-schemes.svg)](https://hackage.haskell.org/package/recursion-schemes) [![Build Status](https://secure.travis-ci.org/ekmett/recursion-schemes.png?branch=master)](http://travis-ci.org/ekmett/recursion-schemes)
+[![Hackage](https://img.shields.io/hackage/v/recursion-schemes.svg)](https://hackage.haskell.org/package/recursion-schemes) [![Build Status](https://github.com/ekmett/recursion-schemes/workflows/Haskell-CI/badge.svg)](https://github.com/ekmett/recursion-schemes/actions?query=workflow%3AHaskell-CI)
 
 ## What is a recursion scheme?
 
