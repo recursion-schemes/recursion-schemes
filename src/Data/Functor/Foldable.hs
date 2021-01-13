@@ -124,11 +124,17 @@ import Data.Fix (Fix (..), unFix, Mu (..), Nu (..))
 
 -- $setup
 -- >>> :set -XDeriveFunctor -XScopedTypeVariables -XLambdaCase -XGADTs -XFlexibleContexts
+-- >>> import Control.Applicative (Const (..), Applicative (..))
 -- >>> import Control.Monad (void)
 -- >>> import Data.Char (toUpper)
+-- >>> import Data.Fix (Fix (..))
 -- >>> import Data.Foldable (traverse_)
 -- >>> import Data.List (partition)
+-- >>> import Data.List.NonEmpty (NonEmpty (..))
 -- >>> import Data.Maybe (maybeToList)
+-- >>> import Data.Tree (Tree (..))
+--
+-- >>> import Data.Functor.Base
 --
 -- >>> let showTree = putStrLn . go where go (Node x xs) = if null xs then x else "(" ++ unwords (x : map go xs) ++ ")"
 

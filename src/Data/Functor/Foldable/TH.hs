@@ -106,14 +106,12 @@ import Data.Functor.Foldable
 --
 -- Some doctests:
 --
--- >>> data Expr a = Lit a | Add (Expr a) (Expr a) | Expr a :* [Expr a]
--- >>> ; makeBaseFunctor ''Expr
+-- >>> data Expr a = Lit a | Add (Expr a) (Expr a) | Expr a :* [Expr a]; makeBaseFunctor ''Expr
 --
 -- >>> :t AddF
 -- AddF :: r -> r -> ExprF a r
 --
--- >>> data Rose f a = Rose a (f (Rose f a))
--- >>> ; makeBaseFunctor [d| instance Functor f => Recursive (Rose f a) |]
+-- >>> data Rose f a = Rose a (f (Rose f a)); makeBaseFunctor [d| instance Functor f => Recursive (Rose f a) |]
 --
 -- >>> :t RoseF
 -- RoseF :: a -> f r -> RoseF f a r
