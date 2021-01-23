@@ -134,24 +134,48 @@ The `makeBaseFunctor` line uses Template Haskell to generate our `ExprF` datatyp
 All of our examples so far have used `cata`. There are many more recursion-schemes. Here is an example which follows a different recursive structure:
 
 ```haskell
-data Type
-  = Arrow Type Type
-  | IntType
-
-djinn :: Type -> Expr
-djinn IntType       = Constant 42
-djinn (Arrow t1 t2) = Lam "x" (djinn t2)
+-- |
+-- >>> power 6
+-- Lam "x" (Let "y" (Mul (Mul (Var "x") (Var "x")) (Var "x")) (Mul (Var "y") (Var "y")))
+--
+-- that is, (\x -> let y = x*x*x in y*y)
+power :: Int -> Expr
+power = Lam "x" . go
+  where
+    go :: Int -> Expr
+    go n
+      | n == 1
+        = Var "x"
+      | n > 2 && n `mod` 2 == 0
+        = Let "y" (go (n `div` 2))
+              (Var "y" `Mul` Var "y")
+      | otherwise
+        = go (n - 1) `Mul` Var "x"
 ```
 
-That recursive structure is captured by the [`ana`](https://hackage.haskell.org/package/recursion-schemes/docs/Data-Functor-Foldable.html#v:ana) recursion-scheme:
+That recursive structure is captured by the [`futu`](https://hackage.haskell.org/package/recursion-schemes/docs/Data-Functor-Foldable.html#v:futu) recursion-scheme:
 
 ```haskell
-djinn :: Type -> Expr
-djinn = ana go
+import Control.Monad.Free
+
+var :: String -> Free ExprF a
+var name = Free (VarF name)
+
+mul :: Free ExprF a -> Free ExprF a -> Free ExprF a
+mul x y = Free (MulF x y)
+
+power :: Int -> Expr
+power = Lam "x" . futu go
   where
-    go :: Type -> ExprF Type
-    go IntType       = ConstantF 42
-    go (Arrow t1 t2) = LamF "x" t2
+    go :: Int -> ExprF (Free ExprF Int)
+    go n
+      | n == 1
+        = VarF "x"
+      | n > 2 && n `mod` 2 == 0
+        = LetF "y" (pure (n `div` 2))
+               (var "y" `mul` var "y")
+      | otherwise
+        = pure (n - 1) `MulF` var "x"
 ```
 
 The [Data.Functor.Foldable](https://hackage.haskell.org/package/recursion-schemes/docs/Data-Functor-Foldable.html) module provides many more.
