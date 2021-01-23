@@ -8,59 +8,69 @@ This package represents common recursion patterns as higher-order functions.
 
 Here are two recursive functions.
 
-    sum :: [Int] -> Int
-    sum [] = 0
-    sum (x:xs) = x + sum xs
+```haskell
+sum :: [Int] -> Int
+sum [] = 0
+sum (x:xs) = x + sum xs
 
-    product :: [Int] -> Int
-    product [] = 1
-    product (x:xs) = x * product xs
+product :: [Int] -> Int
+product [] = 1
+product (x:xs) = x * product xs
+```
 
 These functions are very similar. In both cases, the empty list is the base case. In the cons case, each makes a recursive call on the tail of the list. Then, the head of the list is combined with the result using a binary function.
 
 We can abstract over those similarities using a higher-order function, [`foldr`](https://hackage.haskell.org/package/base/docs/Data-List.html#v:foldr):
 
-    sum     = foldr 0 (+)
-    product = foldr 1 (*)
+```haskell
+sum     = foldr 0 (+)
+product = foldr 1 (*)
+```
 
 ## Other recursive types
 
 `foldr` works great for lists. The higher-order functions provided by this library help with other recursive datatypes. Here are two recursive functions on [`Tree`s](https://hackage.haskell.org/package/containers/docs/Data-Tree.html#t:Tree):
 
-    depth :: Tree Int -> Int
-    depth (Node _ subTrees) = 1 + maximum subTrees
+```haskell
+depth :: Tree Int -> Int
+depth (Node _ subTrees) = 1 + maximum subTrees
 
-    size :: Tree Int -> Int
-    size (Node _ subTrees) = 1 + sum subTrees
+size :: Tree Int -> Int
+size (Node _ subTrees) = 1 + sum subTrees
+```
 
 It is not possible to use `foldr` to simplify `depth`. Conceptually, `foldr` is flattening all the elements of the tree into a list before combining them with the binary function. This does not work for `depth` because it needs to examine the structure of the tree, which `foldr` flattened away.
 
 We can instead use one of the higher-order functions provided by this library, [`cata`](https://hackage.haskell.org/package/recursion-schemes/docs/Data-Functor-Foldable.html#v:cata).
 
-    import Data.Functor.Base (TreeF(..))
-    import Data.Functor.Foldable
+```haskell
+import Data.Functor.Base (TreeF(..))
+import Data.Functor.Foldable
 
-    -- data TreeF a r = NodeF a [r]
+-- data TreeF a r = NodeF a [r]
 
-    depth :: Tree Int -> Int
-    depth = cata go
-      where
-        go :: TreeF Int Int -> Int
-        go (NodeF _ subDepths) = 1 + maximum subDepths
+depth :: Tree Int -> Int
+depth = cata go
+  where
+    go :: TreeF Int Int -> Int
+    go (NodeF _ subDepths) = 1 + maximum subDepths
 
-    size :: Tree Int -> Int
-    size = cata go
-      where
-        go :: TreeF Int Int -> Int
-        go (NodeF _ subSizes) = 1 + sum subSizes
+size :: Tree Int -> Int
+size = cata go
+  where
+    go :: TreeF Int Int -> Int
+    go (NodeF _ subSizes) = 1 + sum subSizes
+```
 
 In this example, the code is a bit longer, but it is correct. Did you spot the mistake in the version which does not use `cata`? We forgot a call to `fmap`:
 
-    depth :: Tree a -> Int
-    depth (Node _ subTrees) = 1 + maximum (fmap depth subTrees)
+```haskell
+depth :: Tree a -> Int
+depth (Node _ subTrees) = 1 + maximum (fmap depth subTrees)
 
-    size :: Tree a -> Int
-    size (Node _ subTrees) = 1 + sum (fmap size subTrees)
+size :: Tree a -> Int
+size (Node _ subTrees) = 1 + sum (fmap size subTrees)
+```
 
 `cata` automatically adds this call to `fmap`. This is why `subDepths` contains a list of already-computed depths, not a list of sub-trees. In general, each recursive position is replaced by the result of a recursive call. These results have type `Int`, not type `Tree`, so we need a helper datatype `TreeF` to collect these results.
 
@@ -72,39 +82,43 @@ A **recursion-scheme** is a function like `cata` which implements a common recur
 
 Let's look at a more complex example. Here is a small lambda-calculus and a function to compute the [free variables](https://en.wikipedia.org/wiki/Lambda_calculus#Free_variables) of an expression:
 
-    data Expr
-      = Var String
-      | Lam String Expr
-      | App Expr Expr
-      | Constant Int
-      | Add Expr Expr
-      | Sub Expr Expr
-      | Mul Expr Expr
-      | Div Expr Expr
-      | ...
+```haskell
+data Expr
+  = Var String
+  | Lam String Expr
+  | App Expr Expr
+  | Constant Int
+  | Add Expr Expr
+  | Sub Expr Expr
+  | Mul Expr Expr
+  | Div Expr Expr
+  | ...
 
-    freeVars :: Expr -> Set String
-    freeVars (Var name)      = Set.singleton name
-    freeVars (Lam name body) = Set.difference (freeVars body) (Set.singleton name)
-    freeVars (App e1 e2)     = Set.union (freeVars e1) (freeVars e2)
-    freeVars (Constant _)    = Set.empty
-    freeVars (Add e1 e2)     = Set.union (freeVars e1) (freeVars e2)
-    freeVars (Sub e1 e2)     = Set.union (freeVars e1) (freeVars e2)
-    freeVars (Mul e1 e2)     = Set.union (freeVars e1) (freeVars e2)
-    freeVars (Div e1 e2)     = Set.union (freeVars e1) (freeVars e2)
-    freeVars ...
+freeVars :: Expr -> Set String
+freeVars (Var name)      = Set.singleton name
+freeVars (Lam name body) = Set.difference (freeVars body) (Set.singleton name)
+freeVars (App e1 e2)     = Set.union (freeVars e1) (freeVars e2)
+freeVars (Constant _)    = Set.empty
+freeVars (Add e1 e2)     = Set.union (freeVars e1) (freeVars e2)
+freeVars (Sub e1 e2)     = Set.union (freeVars e1) (freeVars e2)
+freeVars (Mul e1 e2)     = Set.union (freeVars e1) (freeVars e2)
+freeVars (Div e1 e2)     = Set.union (freeVars e1) (freeVars e2)
+freeVars ...
+```
 
 As you can see, we had to repeat the `Set.union (freeVars e1) (freeVars e2)` line over and over. With recursion-schemes, this code becomes much shorter:
 
-    makeBaseFunctor ''Expr
+```haskell
+makeBaseFunctor ''Expr
 
-    freeVars :: Expr -> Set String
-    freeVars = cata go
-      where
-        go :: ExprF (Set String) -> Set String
-        go (VarF name)           = Set.singleton name
-        go (LamF name bodyNames) = Set.difference bodyNames (Set.singleton name)
-        go fNames                = foldr Set.union Set.empty
+freeVars :: Expr -> Set String
+freeVars = cata go
+  where
+    go :: ExprF (Set String) -> Set String
+    go (VarF name)           = Set.singleton name
+    go (LamF name bodyNames) = Set.difference bodyNames (Set.singleton name)
+    go fNames                = foldr Set.union Set.empty
+```
 
 The `makeBaseFunctor` line uses Template Haskell to generate our `ExprF` datatype, a single layer of the `Expr` datatype. `makeBaseFunctor` also generates instances which are useful when using recursion-schemes. For example, we make use of the `Foldable ExprF` instance on the last line of `go`. This `Foldable` instance exists because `ExprF` has kind `* -> *`, while `Expr` has kind `*`.
 
@@ -112,22 +126,26 @@ The `makeBaseFunctor` line uses Template Haskell to generate our `ExprF` datatyp
 
 All of our examples so far have used `cata`. There are many more recursion-schemes. Here is an example which follows a different recursive structure:
 
-    data Type
-      = Arrow Type Type
-      | IntType
+```haskell
+data Type
+  = Arrow Type Type
+  | IntType
 
-    djinn :: Type -> Expr
-    djinn IntType       = Constant 42
-    djinn (Arrow t1 t2) = Lam "x" (djinn t2)
+djinn :: Type -> Expr
+djinn IntType       = Constant 42
+djinn (Arrow t1 t2) = Lam "x" (djinn t2)
+```
 
 That recursive structure is captured by the [`ana`](https://hackage.haskell.org/package/recursion-schemes/docs/Data-Functor-Foldable.html#v:ana) recursion-scheme:
 
-    djinn :: Type -> Expr
-    djinn = ana go
-      where
-        go :: Type -> ExprF Type
-        go IntType       = ConstantF 42
-        go (Arrow t1 t2) = LamF "x" t2
+```haskell
+djinn :: Type -> Expr
+djinn = ana go
+  where
+    go :: Type -> ExprF Type
+    go IntType       = ConstantF 42
+    go (Arrow t1 t2) = LamF "x" t2
+```
 
 The [Data.Functor.Foldable](https://hackage.haskell.org/package/recursion-schemes/docs/Data-Functor-Foldable.html) module provides many more.
 
