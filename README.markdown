@@ -84,6 +84,9 @@ A **recursion-scheme** is a function like `cata` which implements a common recur
 Let's look at a more complex example. Here is a small lambda-calculus and a function to compute the [free variables](https://en.wikipedia.org/wiki/Lambda_calculus#Free_variables) of an expression:
 
 ```haskell
+import Data.Set (Set)
+import qualified Data.Set as Set
+
 data Expr
   = Var String
   | Lam String Expr
