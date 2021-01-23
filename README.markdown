@@ -135,47 +135,22 @@ All of our examples so far have used `cata`. There are many more recursion-schem
 
 ```haskell
 -- |
--- >>> power 6
--- Lam "x" (Let "y" (Mul (Mul (Var "x") (Var "x")) (Var "x")) (Mul (Var "y") (Var "y")))
---
--- that is, (\x -> let y = x*x*x in y*y)
-power :: Int -> Expr
-power = Lam "x" . go
-  where
-    go :: Int -> Expr
-    go n
-      | n == 1
-        = Var "x"
-      | n > 2 && n `mod` 2 == 0
-        = Let "y" (go (n `div` 2))
-              (Var "y" `Mul` Var "y")
-      | otherwise
-        = go (n - 1) `Mul` Var "x"
+-- >>> halves 256
+-- [256,128,64,32,16,8,4,2,1]
+halves :: Int -> [Int]
+halves 0 = []
+halves n = n : halves (n `div` 2)
 ```
 
-That recursive structure is captured by the [`futu`](https://hackage.haskell.org/package/recursion-schemes/docs/Data-Functor-Foldable.html#v:futu) recursion-scheme:
+That recursive structure is captured by the [`ana`](https://hackage.haskell.org/package/recursion-schemes/docs/Data-Functor-Foldable.html#v:ana) recursion-scheme:
 
 ```haskell
-import Control.Monad.Free
-
-var :: String -> Free ExprF a
-var name = Free (VarF name)
-
-mul :: Free ExprF a -> Free ExprF a -> Free ExprF a
-mul x y = Free (MulF x y)
-
-power :: Int -> Expr
-power = Lam "x" . futu go
+halves :: Int -> [Int]
+halves = ana go
   where
-    go :: Int -> ExprF (Free ExprF Int)
-    go n
-      | n == 1
-        = VarF "x"
-      | n > 2 && n `mod` 2 == 0
-        = LetF "y" (pure (n `div` 2))
-               (var "y" `mul` var "y")
-      | otherwise
-        = pure (n - 1) `MulF` var "x"
+    go :: Int -> ListF Int Int
+    go 0 = Nil
+    go n = Cons n (n `div` 2)
 ```
 
 The [Data.Functor.Foldable](https://hackage.haskell.org/package/recursion-schemes/docs/Data-Functor-Foldable.html) module provides many more.
