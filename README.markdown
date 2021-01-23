@@ -117,7 +117,7 @@ freeVars = cata go
     go :: ExprF (Set String) -> Set String
     go (VarF name)           = Set.singleton name
     go (LamF name bodyNames) = Set.difference bodyNames (Set.singleton name)
-    go fNames                = foldr Set.union Set.empty
+    go fNames                = foldr Set.union Set.empty fNames
 ```
 
 The `makeBaseFunctor` line uses Template Haskell to generate our `ExprF` datatype, a single layer of the `Expr` datatype. `makeBaseFunctor` also generates instances which are useful when using recursion-schemes. For example, we make use of the `Foldable ExprF` instance on the last line of `go`. This `Foldable` instance exists because `ExprF` has kind `* -> *`, while `Expr` has kind `*`.
