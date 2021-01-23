@@ -113,6 +113,9 @@ freeVars ...
 As you can see, we had to repeat the `Set.union (freeVars e1) (freeVars e2)` line over and over. With recursion-schemes, this code becomes much shorter:
 
 ```haskell
+{-# LANGUAGE DeriveFunctor, DeriveFoldable, DeriveTraversable, TemplateHaskell, TypeFamilies #-}
+import Data.Functor.Foldable.TH (makeBaseFunctor)
+
 makeBaseFunctor ''Expr
 
 freeVars :: Expr -> Set String
