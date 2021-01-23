@@ -47,7 +47,8 @@ We can instead use one of the higher-order functions provided by this library, [
 import Data.Functor.Base (TreeF(..))
 import Data.Functor.Foldable
 
--- data TreeF a r = NodeF a [r]
+-- data Tree  a   = Node  a [Tree a]
+-- data TreeF a r = NodeF a [r     ]
 
 depth :: Tree a -> Int
 depth = cata go
