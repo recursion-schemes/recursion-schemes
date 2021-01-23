@@ -32,10 +32,10 @@ product = foldr (*) 1
 `foldr` works great for lists. The higher-order functions provided by this library help with other recursive datatypes. Here are two recursive functions on [`Tree`s](https://hackage.haskell.org/package/containers/docs/Data-Tree.html#t:Tree):
 
 ```haskell
-depth :: Tree Int -> Int
+depth :: Tree a -> Int
 depth (Node _ subTrees) = 1 + maximum subTrees
 
-size :: Tree Int -> Int
+size :: Tree a -> Int
 size (Node _ subTrees) = 1 + sum subTrees
 ```
 
@@ -49,16 +49,16 @@ import Data.Functor.Foldable
 
 -- data TreeF a r = NodeF a [r]
 
-depth :: Tree Int -> Int
+depth :: Tree a -> Int
 depth = cata go
   where
-    go :: TreeF Int Int -> Int
+    go :: TreeF a Int -> Int
     go (NodeF _ subDepths) = 1 + maximum subDepths
 
-size :: Tree Int -> Int
+size :: Tree a -> Int
 size = cata go
   where
-    go :: TreeF Int Int -> Int
+    go :: TreeF a Int -> Int
     go (NodeF _ subSizes) = 1 + sum subSizes
 ```
 
