@@ -23,8 +23,8 @@ These functions are very similar. In both cases, the empty list is the base case
 We can abstract over those similarities using a higher-order function, [`foldr`](https://hackage.haskell.org/package/base/docs/Data-List.html#v:foldr):
 
 ```haskell
-sum     = foldr 0 (+)
-product = foldr 1 (*)
+sum     = foldr (+) 0
+product = foldr (*) 1
 ```
 
 ## Other recursive types
