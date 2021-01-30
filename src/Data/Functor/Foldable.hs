@@ -18,7 +18,7 @@
 -- License     :  BSD-style (see the file LICENSE)
 --
 -- Maintainer  : "Samuel Gélineau" <gelisam@gmail.com>,
---               "Oleg Grenrus" <oleg.grenrus@iki.fi>,
+--               "Luc Tielen" <luc.tielen@gmail.com>,
 --               "Ryan Scott" <ryan.gl.scott@gmail.com>
 -- Stability   :  experimental
 -- Portability :  non-portable
