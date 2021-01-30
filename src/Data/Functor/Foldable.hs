@@ -60,6 +60,7 @@ module Data.Functor.Foldable
   , mzygo
   , mana
   , mapo
+  , mfutu
   -- ** Fokkinga's recursion-schemes
   , prepro
   , postpro
