@@ -38,6 +38,7 @@ module Data.Functor.Foldable
   , zygo
   , cataA
   -- * Unfolding
+  , Corecursive(embed)
   , unfold
   , ana
   , apo
