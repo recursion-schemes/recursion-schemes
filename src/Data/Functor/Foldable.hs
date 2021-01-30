@@ -26,68 +26,75 @@
 ----------------------------------------------------------------------------
 module Data.Functor.Foldable
   (
-  -- * Base functors for fixed points
+  -- * Base functors
     Base
   , ListF(..)
   -- * Folding
-  , Recursive(..)
-  -- ** Combinators
-  , gapo
-  , gcata
-  , zygo
-  , gzygo
+  , Recursive(project)
+  , fold
+  , cata
+  , para
   , histo
-  , ghisto
+  , zygo
+  , cataA
+  -- * Unfolding
+  , unfold
+  , ana
+  , apo
   , futu
-  , gfutu
+  -- * Combining unfolds and folds
+  , refold
+  , hylo
   , chrono
+  -- * Changing representation
+  , refix
+  , hoist
+  , transverse
+  , cotransverse
+  -- * Advanced usage
+  -- ** Mendler-style recursion-schemes
+  , mcata
+  , mpara
+  , mhisto
+  , mzygo
+  , mana
+  , mapo
+  -- ** Fokkinga's recursion-schemes
+  , prepro
+  , postpro
+  -- ** Elgot (co)algebras
+  , elgot
+  , coelgot
+  -- ** Generalized recursion-schemes
+  , gfold
+  , gcata
+  , gpara
+  , ghisto
+  , gzygo
+  , gunfold
+  , gana
+  , gapo
+  , gfutu
+  , grefold
+  , ghylo
   , gchrono
-  -- ** Distributive laws
+  , gprepro
+  , gpostpro
   , distCata
   , distPara
   , distParaT
-  , distZygo
-  , distZygoT
   , distHisto
   , distGHisto
-  , distFutu
-  , distGFutu
-  -- * Unfolding
-  , Corecursive(..)
-  -- ** Combinators
-  , gana
-  -- ** Distributive laws
+  , distZygo
+  , distZygoT
   , distAna
   , distApo
   , distGApo
   , distGApoT
-  -- * Refolding
-  , hylo
-  , ghylo
-  -- ** Changing representation
-  , hoist
-  , refix
-  -- * Common names
-  , fold, gfold
-  , unfold, gunfold
-  , refold, grefold
-  -- * Mendler-style
-  , mcata
-  , mpara
-  , mzygo
-  , mhisto
-  , mana
-  , mapo
-  , mfutu
-  -- * Elgot (co)algebras
-  , elgot
-  , coelgot
-  -- * Zygohistomorphic prepromorphisms
+  , distFutu
+  , distGFutu
+  -- ** Zygohistomorphic prepromorphisms
   , zygoHistoPrepro
-  -- * Effectful combinators
-  , cataA
-  , transverse
-  , cotransverse
   ) where
 
 import Control.Applicative
