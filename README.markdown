@@ -2,36 +2,159 @@
 
 [![Hackage](https://img.shields.io/hackage/v/recursion-schemes.svg)](https://hackage.haskell.org/package/recursion-schemes) [![Build Status](https://github.com/ekmett/recursion-schemes/workflows/Haskell-CI/badge.svg)](https://github.com/ekmett/recursion-schemes/actions?query=workflow%3AHaskell-CI)
 
-## What is a recursion scheme?
+This package represents common recursion patterns as higher-order functions.
 
-Many recursive functions share the same structure, e.g. pattern-match on the input and, depending on the data constructor, either recur on a smaller input or terminate the recursion with the base case. Another one: start with a seed value, use it to produce the first element of an infinite list, and recur on a modified seed in order to produce the rest of the list. Such a structure is called a recursion scheme.
+## A familiar example
 
-## Benefits
+Here are two recursive functions.
 
-### Clearer
+```haskell
+sum :: [Int] -> Int
+sum [] = 0
+sum (x:xs) = x + sum xs
 
-Each recursion scheme has a unique name, such as "fold" and "unfold"; or, if you prefer the fancy names, "catamorphism" and "anamorphism". If you program with others, it can be useful to have names to refer to those recursion patterns, so you can discuss which type of recursion is the most appropriate for the problem at hand. Even if you program alone, having names with which to clearly label those different solutions can help to structure your thoughts while writing recursive functions.
+product :: [Int] -> Int
+product [] = 1
+product (x:xs) = x * product xs
+```
 
-This library lists the most common recursion schemes, and also provides an implementation corresponding to each one. The idea is that a recursive function may be broken into two parts: the part which is the same in all the recursive functions which follow a given recursion scheme, and the part which is different in each function. Our implementation performs the recursive, common part, and takes as input a function which performs the non-recursive, unique part.
+These functions are very similar. In both cases, the empty list is the base case. In the cons case, each makes a recursive call on the tail of the list. Then, the head of the list is combined with the result using a binary function.
 
-If you use those implementations instead of making explicit recursive calls, your code will simultaneously become clearer (to those who are familiar with recursion schemes) and more obscure (to those who aren't). Obviously, if one knows how to read and understand recursive code but does not know what e.g. `para` means, then the version which uses `para` will look needlessly obfuscated compared to the version they already know how to read. But if one is familiar with `para`, then seeing this familiar name will instantly clarify that this is a path-copying function in the style of `Map.insert`, which allocates new nodes along a path from a node to the root but leaves the rest of the nodes untouched. This is a very useful starting point, guiding the reader to look for the logic which decides which sub-trees to drill through and which sub-trees to leave untouched. In contrast, with the general-recursion version, the reader has no such starting point and must thus read through the entire function (or guess based on the function's name) before they can infer that kind of big picture information.
+We can abstract over those similarities using a higher-order function, [`foldr`](https://hackage.haskell.org/package/base/docs/Data-List.html#v:foldr):
 
-### Faster
+```haskell
+sum     = foldr (+) 0
+product = foldr (*) 1
+```
 
-Using recursion schemes can guide you towards optimizations. When multiple functions are composed, Haskellers often use equational reasoning in order to rearrange those compositions into equivalent compositions which compute the same result, but do so in a different, possibly more efficient manner. When the recursive and non-recursive portions of a function are written separately, more equations become available, as they have more pieces to work with. The paper [Functional Programming with Bananas, Lenses, Envelopes and Barbed Wire](https://maartenfokkinga.github.io/utwente/mmf91m.pdf) has a lot more details on that subject.
+## Other recursive types
 
-### Safer
+`foldr` works great for lists. The higher-order functions provided by this library help with other recursive datatypes. Here are two recursive functions on [`Tree`s](https://hackage.haskell.org/package/containers/docs/Data-Tree.html#t:Tree):
 
-Using recursion schemes can help you to avoid accidentally writing infinite or non-productive loops. For example, when producing an infinite list, it would be a mistake to look at the result of the recursive call in order to decide which element to produce as the head of the list, because that recursive call will itself look at its recursive call, etc., and so the information will never be returned. With `ana`, the non-recursive function you need to provide as input intentionally does not have access to the result of the recursive call, so you cannot make that mistake.
+```haskell
+depth :: Tree a -> Int
+depth (Node _ subTrees) = 1 + maximum subTrees
 
-### Composable
+size :: Tree a -> Int
+size (Node _ subTrees) = 1 + sum subTrees
+```
 
-Many recursion schemes can be implemented in terms of each other. So if you notice that the non-recursive functions you provide themselves seem to share a common pattern, you might be accidentally reimplementing an existing recursion scheme which already has those common parts builtin; or maybe you have stumbled upon a new recursion scheme which does not yet have a name, and which you may want to implement yourself.
+It is not possible to use `foldr` to simplify `depth`. Conceptually, `foldr` is flattening all the elements of the tree into a list before combining them with the binary function. This does not work for `depth` because it needs to examine the structure of the tree, which `foldr` flattened away.
 
-One way to implement such a custom recursion scheme is to combine the features of existing recursion schemes. For example, a "paramorphism" gives the non-recursive function access to the original sub-trees, a "zygomorphism" gives that function access to auxiliary results computed from those sub-trees, and so the combined "zygomorphic paramorphism" gives that function access to both the original sub-trees and the auxiliary results. In order to construct such combinations, most of our recursion schemes come in a generalized variant, e.g. `gzygo`, and in a "distributive law transformer" variant, e.g. `distZygoT`. Just like monad transformers, distributive law transformers can be combined into stacks, and like monad transformers, the order in which you combine the layers determines how the layers interact with each other. Apply a generalized recursion scheme to a stack of distributive laws in order to obtain a recursion scheme which has both the features of the generalized recursion scheme and those of the distributive laws.
+We can instead use one of the higher-order functions provided by this library, [`cata`](https://hackage.haskell.org/package/recursion-schemes/docs/Data-Functor-Foldable.html#v:cata).
+
+```haskell
+import Data.Functor.Base (TreeF(..))
+import Data.Functor.Foldable
+
+-- data Tree  a   = Node  a [Tree a]
+-- data TreeF a r = NodeF a [r     ]
+
+depth :: Tree a -> Int
+depth = cata go
+  where
+    go :: TreeF a Int -> Int
+    go (NodeF _ subDepths) = 1 + maximum subDepths
+
+size :: Tree a -> Int
+size = cata go
+  where
+    go :: TreeF a Int -> Int
+    go (NodeF _ subSizes) = 1 + sum subSizes
+```
+
+In this example, the code is a bit longer, but it is correct. Did you spot the mistake in the version which does not use `cata`? We forgot a call to `fmap`:
+
+```haskell
+depth :: Tree a -> Int
+depth (Node _ subTrees) = 1 + maximum (fmap depth subTrees)
+
+size :: Tree a -> Int
+size (Node _ subTrees) = 1 + sum (fmap size subTrees)
+```
+
+`cata` automatically adds this call to `fmap`. This is why `subDepths` contains a list of already-computed depths, not a list of sub-trees. In general, each recursive position is replaced by the result of a recursive call. These results have type `Int`, not type `Tree`, so we need a helper datatype `TreeF` to collect these results.
+
+When you think about computing the depth, you probably think "it's 1 plus the maximum of the sub-depths". With `cata`, this is exactly what we write. By contrast, without `cata`, we need to describe both the "how" and the "what" in our implementation. The "how" is about recurring over the sub-trees (using `fmap depth`), while the "what" is about adding 1 to the maximum of the sub-trees. `cata` takes care of the recursion, so you can focus solely on the "what".
+
+A **recursion-scheme** is a function like `cata` which implements a common recursion pattern. It is a higher-order recursive function which takes a non-recursive function as an argument. That non-recursive function describes the part which is unique to your calculation: the "what".
+
+## Types with many constructors
+
+Let's look at a more complex example. Here is a small lambda-calculus and a function to compute the [free variables](https://en.wikipedia.org/wiki/Lambda_calculus#Free_variables) of an expression:
+
+```haskell
+import Data.Set (Set)
+import qualified Data.Set as Set
+
+data Expr
+  = Var String
+  | Lam String Expr
+  | App Expr Expr
+  | Constant Int
+  | Add Expr Expr
+  | Sub Expr Expr
+  | Mul Expr Expr
+  | Div Expr Expr
+  | ...
+
+freeVars :: Expr -> Set String
+freeVars (Var name)      = Set.singleton name
+freeVars (Lam name body) = Set.difference (freeVars body) (Set.singleton name)
+freeVars (App e1 e2)     = Set.union (freeVars e1) (freeVars e2)
+freeVars (Constant _)    = Set.empty
+freeVars (Add e1 e2)     = Set.union (freeVars e1) (freeVars e2)
+freeVars (Sub e1 e2)     = Set.union (freeVars e1) (freeVars e2)
+freeVars (Mul e1 e2)     = Set.union (freeVars e1) (freeVars e2)
+freeVars (Div e1 e2)     = Set.union (freeVars e1) (freeVars e2)
+freeVars ...
+```
+
+As you can see, we had to repeat the `Set.union (freeVars e1) (freeVars e2)` line over and over. With recursion-schemes, this code becomes much shorter:
+
+```haskell
+{-# LANGUAGE DeriveFunctor, DeriveFoldable, DeriveTraversable, TemplateHaskell, TypeFamilies #-}
+import Data.Functor.Foldable.TH (makeBaseFunctor)
+
+makeBaseFunctor ''Expr
+
+freeVars :: Expr -> Set String
+freeVars = cata go
+  where
+    go :: ExprF (Set String) -> Set String
+    go (VarF name)           = Set.singleton name
+    go (LamF name bodyNames) = Set.difference bodyNames (Set.singleton name)
+    go fNames                = foldr Set.union Set.empty fNames
+```
+
+The `makeBaseFunctor` line uses Template Haskell to generate our `ExprF` datatype, a single layer of the `Expr` datatype. `makeBaseFunctor` also generates instances which are useful when using recursion-schemes. For example, we make use of the `Foldable ExprF` instance on the last line of `go`. This `Foldable` instance exists because `ExprF` has kind `* -> *`, while `Expr` has kind `*`.
+
+## Other recursion-schemes
+
+All of our examples so far have used `cata`. There are many more recursion-schemes. Here is an example which follows a different recursive structure:
+
+```haskell
+-- |
+-- >>> halves 256
+-- [256,128,64,32,16,8,4,2,1]
+halves :: Int -> [Int]
+halves 0 = []
+halves n = n : halves (n `div` 2)
+```
+
+That recursive structure is captured by the [`ana`](https://hackage.haskell.org/package/recursion-schemes/docs/Data-Functor-Foldable.html#v:ana) recursion-scheme:
+
+```haskell
+halves :: Int -> [Int]
+halves = ana go
+  where
+    go :: Int -> ListF Int Int
+    go 0 = Nil
+    go n = Cons n (n `div` 2)
+```
+
+The [Data.Functor.Foldable](https://hackage.haskell.org/package/recursion-schemes/docs/Data-Functor-Foldable.html) module provides many more.
 
 ## Contributing
 
-Contributions and bug reports are welcome!
-
-Please feel free to contact us by opening a github issue or by hopping onto the #haskell IRC channel on irc.freenode.net.
+Contributions and [bug reports](https://github.com/ekmett/recursion-schemes/issues/new) are welcome!
