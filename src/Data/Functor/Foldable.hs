@@ -18,7 +18,7 @@
 -- License     :  BSD-style (see the file LICENSE)
 --
 -- Maintainer  : "Samuel Gélineau" <gelisam@gmail.com>,
---               "Oleg Grenrus" <oleg.grenrus@iki.fi>,
+--               "Luc Tielen" <luc.tielen@gmail.com>,
 --               "Ryan Scott" <ryan.gl.scott@gmail.com>
 -- Stability   :  experimental
 -- Portability :  non-portable
@@ -26,68 +26,77 @@
 ----------------------------------------------------------------------------
 module Data.Functor.Foldable
   (
-  -- * Base functors for fixed points
+  -- * Base functors
     Base
   , ListF(..)
   -- * Folding
-  , Recursive(..)
-  -- ** Combinators
-  , gapo
-  , gcata
-  , zygo
-  , gzygo
+  , Recursive(project)
+  , fold
+  , cata
+  , para
   , histo
-  , ghisto
+  , zygo
+  , cataA
+  -- * Unfolding
+  , Corecursive(embed)
+  , unfold
+  , ana
+  , apo
   , futu
-  , gfutu
+  -- * Combining unfolds and folds
+  , refold
+  , hylo
   , chrono
+  -- * Changing representation
+  , refix
+  , hoist
+  , transverse
+  , cotransverse
+  -- * Advanced usage
+  -- ** Mendler-style recursion-schemes
+  , mcata
+  , mpara
+  , mhisto
+  , mzygo
+  , mana
+  , mapo
+  , mfutu
+  -- ** Fokkinga's recursion-schemes
+  , prepro
+  , postpro
+  -- ** Elgot (co)algebras
+  , elgot
+  , coelgot
+  -- ** Generalized recursion-schemes
+  , gfold
+  , gcata
+  , gpara
+  , ghisto
+  , gzygo
+  , gunfold
+  , gana
+  , gapo
+  , gfutu
+  , grefold
+  , ghylo
   , gchrono
-  -- ** Distributive laws
+  , gprepro
+  , gpostpro
   , distCata
   , distPara
   , distParaT
-  , distZygo
-  , distZygoT
   , distHisto
   , distGHisto
-  , distFutu
-  , distGFutu
-  -- * Unfolding
-  , Corecursive(..)
-  -- ** Combinators
-  , gana
-  -- ** Distributive laws
+  , distZygo
+  , distZygoT
   , distAna
   , distApo
   , distGApo
   , distGApoT
-  -- * Refolding
-  , hylo
-  , ghylo
-  -- ** Changing representation
-  , hoist
-  , refix
-  -- * Common names
-  , fold, gfold
-  , unfold, gunfold
-  , refold, grefold
-  -- * Mendler-style
-  , mcata
-  , mpara
-  , mzygo
-  , mhisto
-  , mana
-  , mapo
-  , mfutu
-  -- * Elgot (co)algebras
-  , elgot
-  , coelgot
-  -- * Zygohistomorphic prepromorphisms
+  , distFutu
+  , distGFutu
+  -- ** Zygohistomorphic prepromorphisms
   , zygoHistoPrepro
-  -- * Effectful combinators
-  , cataA
-  , transverse
-  , cotransverse
   ) where
 
 import Control.Applicative
@@ -176,19 +185,7 @@ class Functor (Base t) => Recursive t where
   project = to . gcoerce . from
 #endif
 
-  -- | A generalization of 'foldr'. The elements of the base functor, called the
-  -- "recursive positions", give the result of folding the sub-tree at that
-  -- position.
-  --
-  -- >>> :{
-  -- >>> let oursum = cata $ \case
-  -- >>>        Nil        -> 0
-  -- >>>        Cons x acc -> x + acc
-  -- >>> :}
-  --
-  -- >>> oursum [1,2,3]
-  -- 6
-  --
+  -- | An alias for 'fold'.
   cata :: (Base t a -> a) -- ^ a (Base t)-algebra
        -> t               -- ^ fixed point
        -> a               -- ^ result
@@ -248,19 +245,7 @@ class Functor (Base t) => Corecursive t where
   embed = to . gcoerce . from
 #endif
 
-  -- | A generalization of 'unfoldr'. The starting seed is expanded into a base
-  -- functor whose recursive positions contain more seeds, which are themselves
-  -- expanded, and so on.
-  --
-  -- >>> :{
-  -- >>> let ourEnumFromTo :: Int -> Int -> [Int]
-  -- >>>     ourEnumFromTo lo hi = ana go lo where
-  -- >>>         go i = if i > hi then Nil else Cons i (i + 1)
-  -- >>> :}
-  --
-  -- >>> ourEnumFromTo 1 4
-  -- [1,2,3,4]
-  --
+  -- | An alias for 'unfold'.
   ana
     :: (a -> Base t a) -- ^ a (Base t)-coalgebra
     -> a               -- ^ seed
@@ -289,7 +274,41 @@ class Functor (Base t) => Corecursive t where
     -> t
   gpostpro k e g = a . return where a = embed . fmap (hoist e . a . join) . k . liftM g
 
--- | An optimized version of @cata f . ana g@.
+-- | An alias for 'refold'.
+hylo :: Functor f => (f b -> b) -> (a -> f a) -> a -> b
+hylo f g = h where h = f . fmap h . g
+
+-- | A generalization of 'foldr'. The elements of the base functor, called the
+-- "recursive positions", give the result of folding the sub-tree at that
+-- position.
+--
+-- >>> :{
+-- >>> let oursum = fold $ \case
+-- >>>        Nil        -> 0
+-- >>>        Cons x acc -> x + acc
+-- >>> :}
+--
+-- >>> oursum [1,2,3]
+-- 6
+fold :: Recursive t => (Base t a -> a) -> t -> a
+fold = cata
+
+-- | A generalization of 'unfoldr'. The starting seed is expanded into a base
+-- functor whose recursive positions contain more seeds, which are themselves
+-- expanded, and so on.
+--
+-- >>> :{
+-- >>> let ourEnumFromTo :: Int -> Int -> [Int]
+-- >>>     ourEnumFromTo lo hi = ana go lo where
+-- >>>         go i = if i > hi then Nil else Cons i (i + 1)
+-- >>> :}
+--
+-- >>> ourEnumFromTo 1 4
+-- [1,2,3,4]
+unfold :: Corecursive t => (a -> Base t a) -> a -> t
+unfold = ana
+
+-- | An optimized version of @fold f . unfold g@.
 --
 -- Useful when your recursion structure is shaped like a particular recursive
 -- datatype, but you're neither consuming nor producing that recursive datatype.
@@ -300,7 +319,7 @@ class Functor (Base t) => Corecursive t where
 --
 -- >>> :{
 -- >>> let quicksort :: Ord a => [a] -> [a]
--- >>>     quicksort = hylo merge split where
+-- >>>     quicksort = refold merge split where
 -- >>>         split []     = Tip
 -- >>>         split (x:xs) = let (l, r) = partition (<x) xs in Branch l x r
 -- >>>
@@ -310,19 +329,6 @@ class Functor (Base t) => Corecursive t where
 --
 -- >>> quicksort [1,5,2,8,4,9,8]
 -- [1,2,4,5,8,8,9]
---
-hylo :: Functor f => (f b -> b) -> (a -> f a) -> a -> b
-hylo f g = h where h = f . fmap h . g
-
--- | An alias for 'cata'.
-fold :: Recursive t => (Base t a -> a) -> t -> a
-fold = cata
-
--- | An alias for 'ana'.
-unfold :: Corecursive t => (a -> Base t a) -> a -> t
-unfold = ana
-
--- | An alias for 'hylo'.
 refold :: Functor f => (f b -> b) -> (a -> f a) -> a -> b
 refold = hylo
 
