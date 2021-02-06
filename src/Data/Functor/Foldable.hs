@@ -29,16 +29,27 @@ module Data.Functor.Foldable
   -- * Base functors
     Base
   , ListF(..)
-  -- * Folding
+  -- * Type classes
   , Recursive(project)
+  , Corecursive(embed)
+  -- * Folding functions
+  -- | Folding functions allow you to reduce a recursive type into a value. The value can be a simple type such as 'Int' or 'String', or it can also be a recursive type. Each of the functions below will be accompanied by an example which folds the following @Tree Int@ down to some 'String'.
+  --
+  -- > 0
+  -- >   1
+  -- >   2
+  -- >   3
+  -- >     31
+  -- >       311
+  -- >         3111
+  -- >         3112
   , fold
   , cata
   , para
   , histo
   , zygo
   , cataA
-  -- * Unfolding
-  , Corecursive(embed)
+  -- * Unfolding functions
   , unfold
   , ana
   , apo
@@ -138,7 +149,7 @@ import Data.Fix (Fix (..), unFix, Mu (..), Nu (..))
 -- >>> import Data.Char (toUpper)
 -- >>> import Data.Fix (Fix (..))
 -- >>> import Data.Foldable (traverse_)
--- >>> import Data.List (partition)
+-- >>> import Data.List (intercalate, partition)
 -- >>> import Data.List.NonEmpty (NonEmpty (..))
 -- >>> import Data.Maybe (maybeToList)
 -- >>> import Data.Tree (Tree (..))
@@ -146,6 +157,8 @@ import Data.Fix (Fix (..), unFix, Mu (..), Nu (..))
 -- >>> import Data.Functor.Base
 --
 -- >>> let showTree = putStrLn . go where go (Node x xs) = if null xs then x else "(" ++ unwords (x : map go xs) ++ ")"
+--
+-- >>> let myTree = Node 0 [Node 1 [], Node 2 [], Node 3 [Node 31 [Node 311 [Node 3111 [], Node 3112 []]]]]
 
 -- | Obtain the base functor for a recursive datatype.
 --
@@ -278,18 +291,19 @@ class Functor (Base t) => Corecursive t where
 hylo :: Functor f => (f b -> b) -> (a -> f a) -> a -> b
 hylo f g = h where h = f . fmap h . g
 
--- | A generalization of 'foldr'. The elements of the base functor, called the
--- "recursive positions", give the result of folding the sub-tree at that
--- position.
+-- | Folds a recursive type down to a value, one layer at a time.
+--
+-- In our running example, one layer consists of an 'Int' and a list of recursive positions. In @Tree Int@, those recursive positions contain sub-trees of type @Tree Int@. Since we are working one layer at a time, the @Base t a -> a@ function is not given a @Tree Int@, but a @TreeF Int String@. That is, each recursive position contains the 'String' resulting from recursively folding the corresponding sub-tree.
 --
 -- >>> :{
--- >>> let oursum = fold $ \case
--- >>>        Nil        -> 0
--- >>>        Cons x acc -> x + acc
--- >>> :}
+-- pprint1 :: Tree Int -> String
+-- pprint1 = fold $ \case
+--   NodeF i [] -> show i
+--   NodeF i ss -> show i ++ ": [" ++ intercalate ", " ss ++ "]"
+-- :}
 --
--- >>> oursum [1,2,3]
--- 6
+-- >>> putStrLn $ pprint1 myTree
+-- 0: [1, 2, 3: [31: [311: [3111, 3112]]]]
 fold :: Recursive t => (Base t a -> a) -> t -> a
 fold = cata
 
