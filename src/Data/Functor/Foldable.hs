@@ -33,16 +33,7 @@ module Data.Functor.Foldable
   , Recursive(project)
   , Corecursive(embed)
   -- * Folding functions
-  -- | Folding functions allow you to reduce a recursive type into a value. The value can be a simple type such as 'Int' or 'String', or it can also be a recursive type. Each of the functions below will be accompanied by an example which folds the following @Tree Int@ down to some 'String'.
-  --
-  -- > 0
-  -- >   1
-  -- >   2
-  -- >   3
-  -- >     31
-  -- >       311
-  -- >         3111
-  -- >         3112
+  -- $foldingFunctions
   , fold
   , cata
   , para
@@ -152,13 +143,33 @@ import Data.Fix (Fix (..), unFix, Mu (..), Nu (..))
 -- >>> import Data.List (intercalate, partition)
 -- >>> import Data.List.NonEmpty (NonEmpty (..))
 -- >>> import Data.Maybe (maybeToList)
--- >>> import Data.Tree (Tree (..))
+-- >>> import Data.Tree (Tree (..), drawTree)
 --
 -- >>> import Data.Functor.Base
 --
 -- >>> let showTree = putStrLn . go where go (Node x xs) = if null xs then x else "(" ++ unwords (x : map go xs) ++ ")"
 --
 -- >>> let myTree = Node 0 [Node 1 [], Node 2 [], Node 3 [Node 31 [Node 311 [Node 3111 [], Node 3112 []]]]]
+
+-- $foldingFunctions
+-- Folding functions allow you to reduce a recursive structure down to a value. The value can be a simple type such as 'Int' or 'String', or it can also be a recursive structure. Each of the functions below will be accompanied by an example which folds the following @Tree Int@ down to some 'String'.
+--
+-- >>> putStr $ drawTree $ fmap show myTree
+-- 0
+-- |
+-- +- 1
+-- |
+-- +- 2
+-- |
+-- `- 3
+--    |
+--    `- 31
+--       |
+--       `- 311
+--          |
+--          +- 3111
+--          |
+--          `- 3112
 
 -- | Obtain the base functor for a recursive datatype.
 --
@@ -199,9 +210,13 @@ class Functor (Base t) => Recursive t where
 #endif
 
   -- | An alias for 'fold'.
-  cata :: (Base t a -> a) -- ^ a (Base t)-algebra
-       -> t               -- ^ fixed point
-       -> a               -- ^ result
+  --
+  -- 'fold' is by far the most common recursion-scheme, because working one layer at a time is the most common strategy for writing a recursive function. But there are also other, rarer strategies. Researchers have given names to the most common strategies, and their name for 'fold' is "catamorphism". They also give its @Base t a -> a@ argument a special name, "(@Base t@)-algebra". More generally, a function of the form @f a -> a@ is called an "f-algebra".
+  --
+  -- The names might seem intimidating at first, but using the standard nomenclature has benefits. If you program with others, it can be useful to have a shared vocabulary to refer to those recursion patterns. For example, you can discuss which type of recursion is the most appropriate for the problem at hand. Names can also help to structure your thoughts while writing recursive functions.
+  --
+  -- The rest of this module lists a few of the other recursion-schemes which are common enough to have a name. In this section, we restrict our attention to those which fold a recursive structure down to a value. Our examples will thus all be functions of type @Tree Int -> String@.
+  cata :: (Base t a -> a) -> t -> a
   cata f = c where c = f . fmap c . project
 
   -- | A variant of 'cata' in which recursive positions also include the
@@ -296,14 +311,16 @@ hylo f g = h where h = f . fmap h . g
 -- In our running example, one layer consists of an 'Int' and a list of recursive positions. In @Tree Int@, those recursive positions contain sub-trees of type @Tree Int@. Since we are working one layer at a time, the @Base t a -> a@ function is not given a @Tree Int@, but a @TreeF Int String@. That is, each recursive position contains the 'String' resulting from recursively folding the corresponding sub-tree.
 --
 -- >>> :{
--- pprint1 :: Tree Int -> String
--- pprint1 = fold $ \case
---   NodeF i [] -> show i
---   NodeF i ss -> show i ++ ": [" ++ intercalate ", " ss ++ "]"
+-- let pprint1 :: Tree Int -> String
+--     pprint1 = fold $ \case
+--       NodeF i [] -> show i
+--       NodeF i ss -> show i ++ ": [" ++ intercalate ", " ss ++ "]"
 -- :}
 --
 -- >>> putStrLn $ pprint1 myTree
 -- 0: [1, 2, 3: [31: [311: [3111, 3112]]]]
+--
+-- More generally, the 't' argument is the recursive value, the 'a' is the final result, and the @Base t a -> a@ function explains how to reduce a single layer full of recursive results down to a result.
 fold :: Recursive t => (Base t a -> a) -> t -> a
 fold = cata
 
