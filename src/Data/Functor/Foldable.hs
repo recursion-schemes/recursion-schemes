@@ -215,7 +215,7 @@ class Functor (Base t) => Recursive t where
   --
   -- The names might seem intimidating at first, but using the standard nomenclature has benefits. If you program with others, it can be useful to have a shared vocabulary to refer to those recursion patterns. For example, you can discuss which type of recursion is the most appropriate for the problem at hand. Names can also help to structure your thoughts while writing recursive functions.
   --
-  -- The rest of this module lists a few of the other recursion-schemes which are common enough to have a name. In this section, we restrict our attention to those which fold a recursive structure down to a value. Our examples will thus all be functions of type @Tree Int -> String@.
+  -- The rest of this module lists a few of the other recursion-schemes which are common enough to have a name. In this section, we restrict our attention to those which fold a recursive structure down to a value. In the examples all functions will be of type @Tree Int -> String@.
   cata :: (Base t a -> a) -> t -> a
   cata f = c where c = f . fmap c . project
 
