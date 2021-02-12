@@ -262,6 +262,11 @@ makePrimForDI' rules mkInstance' isNewtype tyName vars cons = do
           <$> cons'
 
     -- Data definition
+#if MIN_VERSION_template_haskell(2,12,0)
+    derivStrat <- do
+      e <- isExtEnabled DerivingStrategies
+      pure $ if e then Just StockStrategy else Nothing
+#endif
     let dataDec = case consF of
 #if MIN_VERSION_template_haskell(2,11,0)
             [conF] | isNewtype ->
@@ -277,7 +282,7 @@ makePrimForDI' rules mkInstance' isNewtype tyName vars cons = do
           where
             deriveds =
 #if MIN_VERSION_template_haskell(2,12,0)
-              [DerivClause Nothing
+              [DerivClause derivStrat
                 [ ConT functorTypeName
                 , ConT foldableTypeName
                 , ConT traversableTypeName ]]
