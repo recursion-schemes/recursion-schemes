@@ -223,6 +223,70 @@ class Functor (Base t) => Recursive t where
   -- | A variant of 'cata' in which recursive positions also include the
   -- original sub-tree, in addition to the result of folding that sub-tree.
   --
+  -- For our running example, let's add a number to each node indicating how
+  -- many children are below it. To do so, we will need to count those nodes
+  -- from the original sub-tree.
+  --
+  -- >>> :{
+  -- let pprint4 :: Tree Int -> String
+  --     pprint4 = flip runReader 0 . para go
+  --       where
+  --         go :: TreeF Int (Tree Int, Reader Int String)
+  --            -> Reader Int String
+  --         go (NodeF i trss) = do
+  --           -- trss :: [(Tree Int, Reader Int String)]
+  --           -- ts   :: [Tree Int]
+  --           -- rss  :: [Reader Int String]
+  --           -- ss   :: [String]
+  --           let (ts, rss) = unzip trss
+  --           let count = sum $ fmap length ts
+  --           ss <- local (+ 2) $ sequence rss
+  --           indent <- ask
+  --           let s = replicate indent ' '
+  --                ++ "* " ++ show i
+  --                ++ " (" ++ show count ++ ")"
+  --           pure $ intercalate "\n" (s : ss)
+  -- :}
+  --
+  -- >>> putStrLn $ pprint4 myTree
+  -- * 0 (7)
+  --   * 1 (0)
+  --   * 2 (0)
+  --   * 3 (4)
+  --     * 31 (3)
+  --       * 311 (2)
+  --         * 3111 (0)
+  --         * 3112 (0)
+  --
+  -- One common use for 'para' is to construct a new tree which reuses most of
+  -- the sub-trees from the original. In the following example, we insert a new
+  -- node under the leftmost leaf. This requires allocating new nodes along a
+  -- path from the root to that leaf, while keeping every other sub-tree
+  -- untouched.
+  --
+  -- >>> :{
+  -- let insertLeftmost :: Int -> Tree Int -> Tree Int
+  --     insertLeftmost new = para go
+  --       where
+  --         go :: TreeF Int (Tree Int, Tree Int)
+  --            -> Tree Int
+  --         go (NodeF i []) = Node i [Node new []]
+  --         go (NodeF i ((_orig, recur) : tts)) =
+  --           -- tts :: [(Tree Int, Tree Int)]
+  --           let (origs, _recurs) = unzip tts
+  --           in Node i (recur : origs)
+  -- :}
+  --
+  -- >>> putStrLn $ pprint4 $ insertLeftmost 999 myTree
+  -- * 0 (8)
+  --   * 1 (1)
+  --     * 999 (0)
+  --   * 2 (0)
+  --   * 3 (4)
+  --     * 31 (3)
+  --       * 311 (2)
+  --         * 3111 (0)
+  --         * 3112 (0)
   para :: (Base t (t, a) -> a) -> t -> a
   para t = p where p x = t . fmap ((,) <*> p) $ project x
 
@@ -589,6 +653,7 @@ instance Functor f => Corecursive (CMFC.F f a) where
   embed (CMTF.Pure a)  = CMFC.F $ \p _ -> p a
   embed (CMTF.Free fr) = CMFC.F $ \p f -> f $ fmap (cmfcCata p f) fr
 
+-- TODO: link from 'para' to 'zygo'
 zygo :: Recursive t => (Base t b -> b) -> (Base t (b, a) -> a) -> t -> a
 zygo f = gfold (distZygo f)
 
@@ -738,7 +803,7 @@ zygoHistoPrepro f g t = gprepro (distZygoT f distHisto) g t
 --            -> Reader Int String
 --         go (NodeF i rss) = do
 --           -- rss :: [Reader Int String]
---           -- ss :: [String]
+--           -- ss  :: [String]
 --           ss <- local (+ 2) $ sequence rss
 --           indent <- ask
 --           let s = replicate indent ' ' ++ "* " ++ show i
