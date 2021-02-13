@@ -308,6 +308,16 @@ hylo f g = h where h = f . fmap h . g
 
 -- | Folds a recursive type down to a value, one layer at a time.
 --
+-- >>> :{
+-- let mySum :: [Int] -> Int
+--     mySum = fold $ \case
+--       Nil -> 0
+--       Cons x sumXs -> x + sumXs
+-- :}
+--
+-- >>> mySum [10,11,12]
+-- 33
+--
 -- In our running example, one layer consists of an 'Int' and a list of recursive positions. In @Tree Int@, those recursive positions contain sub-trees of type @Tree Int@. Since we are working one layer at a time, the @Base t a -> a@ function is not given a @Tree Int@, but a @TreeF Int String@. That is, each recursive position contains the 'String' resulting from recursively folding the corresponding sub-tree.
 --
 -- >>> :{
