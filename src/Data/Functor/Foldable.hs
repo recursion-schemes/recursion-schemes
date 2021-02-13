@@ -36,10 +36,10 @@ module Data.Functor.Foldable
   -- $foldingFunctions
   , fold
   , cata
+  , cataA
   , para
   , histo
   , zygo
-  , cataA
   -- * Unfolding functions
   , unfold
   , ana
@@ -104,7 +104,7 @@ module Data.Functor.Foldable
 import Control.Applicative
 import Control.Comonad
 import Control.Comonad.Trans.Class
-import Control.Comonad.Trans.Env
+import Control.Comonad.Trans.Env (EnvT(..))
 import qualified Control.Comonad.Cofree as Cofree
 import Control.Comonad.Cofree (Cofree(..))
 import           Control.Comonad.Trans.Cofree (CofreeF, CofreeT(..))
@@ -137,6 +137,7 @@ import Data.Fix (Fix (..), unFix, Mu (..), Nu (..))
 -- >>> :set -XDeriveFunctor -XScopedTypeVariables -XLambdaCase -XGADTs -XFlexibleContexts
 -- >>> import Control.Applicative (Const (..), Applicative (..))
 -- >>> import Control.Monad (void)
+-- >>> import Control.Monad.Trans.Reader (Reader, ask, local, runReader)
 -- >>> import Data.Char (toUpper)
 -- >>> import Data.Fix (Fix (..))
 -- >>> import Data.Foldable (traverse_)
@@ -716,15 +717,79 @@ zygoHistoPrepro f g t = gprepro (distZygoT f distHisto) g t
 -- Effectful combinators
 -------------------------------------------------------------------------------
 
--- | Effectful 'fold'.
+-- | A specialization of 'cata' for effectful folds.
 --
--- This is a type specialisation of 'cata'.
+-- 'cataA' is the same as 'cata', but with a more specialized type. The only
+-- reason it exists is to make it easier to discover how to use this library
+-- with effects.
 --
--- An example terminating a recursion immediately:
+-- For our running example, let's improve the output format of our
+-- pretty-printer by using indentation. To do so, we will need to keep track of
+-- the current indentation level. We will do so using a @Reader Int@ effect.
+-- Our recursive positions will thus contain @Reader Int String@ actions, not
+-- @String@s. This means we need to run those actions in order to get the
+-- results.
 --
--- >>> cataA (\alg -> case alg of { Nil -> pure (); Cons a _ -> Const [a] })  "hello"
--- Const "h"
+-- >>> :{
+-- let pprint2 :: Tree Int -> String
+--     pprint2 = flip runReader 0 . cataA go
+--       where
+--         go :: TreeF Int (Reader Int String)
+--            -> Reader Int String
+--         go (NodeF i rss) = do
+--           -- rss :: [Reader Int String]
+--           -- ss :: [String]
+--           ss <- local (+ 2) $ sequence rss
+--           indent <- ask
+--           let s = replicate indent ' ' ++ "* " ++ show i
+--           pure $ intercalate "\n" (s : ss)
+-- :}
 --
+-- >>> putStrLn $ pprint2 myTree
+-- * 0
+--   * 1
+--   * 2
+--   * 3
+--     * 31
+--       * 311
+--         * 3111
+--         * 3112
+--
+-- The fact that the recursive positions contain 'Reader' actions instead of
+-- 'String's gives us some flexibility. Here, we are able to increase the
+-- indentation by running those actions inside a 'local' block. More generally,
+-- we can control the order of their side-effects, interleave them with other
+-- effects, etc.
+--
+-- A similar technique is to specialize 'cata' so that the result is a
+-- function. This makes it possible for data to flow down in addition to up.
+-- In this modified version of our running example, the indentation level flows
+-- down from the root to the leaves, while the resulting strings flow up from
+-- the leaves to the root.
+--
+-- >>> :{
+-- let pprint3 :: Tree Int -> String
+--     pprint3 t = cataA go t 0
+--       where
+--         go :: TreeF Int (Int -> String)
+--            -> Int -> String
+--         go (NodeF i fs) indent =
+--           -- fs :: [Int -> String]
+--           let indent' = indent + 2
+--               ss = map (\f -> f indent') fs
+--               s = replicate indent ' ' ++ "* " ++ show i
+--           in intercalate "\n" (s : ss)
+-- :}
+--
+-- >>> putStrLn $ pprint3 myTree
+-- * 0
+--   * 1
+--   * 2
+--   * 3
+--     * 31
+--       * 311
+--         * 3111
+--         * 3112
 cataA :: (Recursive t) => (Base t (f a) -> f a) -> t -> f a
 cataA = cata
 
