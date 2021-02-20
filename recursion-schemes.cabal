@@ -1,12 +1,13 @@
 name:          recursion-schemes
 category:      Control, Recursion
-version:       5.2.1
+version:       5.2.2
 license:       BSD2
 cabal-version: >= 1.10
 license-file:  LICENSE
 author:        Edward A. Kmett
 maintainer:    "Samuel Gélineau" <gelisam@gmail.com>,
-               "Ryan Scott" <ryan.gl.scott@gmail.com>
+               "Ryan Scott" <ryan.gl.scott@gmail.com>,
+               "Luc Tielen" <luc.tielen@gmail.com>
 stability:     provisional
 homepage:      http://github.com/ekmett/recursion-schemes/
 bug-reports:   http://github.com/ekmett/recursion-schemes/issues
