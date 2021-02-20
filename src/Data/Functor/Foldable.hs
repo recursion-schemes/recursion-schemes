@@ -271,10 +271,10 @@ class Functor (Base t) => Recursive t where
   --         go :: TreeF Int (Tree Int, Tree Int)
   --            -> Tree Int
   --         go (NodeF i []) = Node i [Node new []]
-  --         go (NodeF i ((_orig, recur) : tts)) =
-  --           -- tts :: [(Tree Int, Tree Int)]
-  --           let (origs, _recurs) = unzip tts
-  --           in Node i (recur : origs)
+  --         go (NodeF i ((_orig, recur) : tts))
+  --             -- tts :: [(Tree Int, Tree Int)]
+  --           = let (origs, _recurs) = unzip tts
+  --             in Node i (recur : origs)
   -- :}
   --
   -- >>> putStrLn $ pprint4 $ insertLeftmost 999 myTree
@@ -838,12 +838,12 @@ zygoHistoPrepro f g t = gprepro (distZygoT f distHisto) g t
 --       where
 --         go :: TreeF Int (Int -> String)
 --            -> Int -> String
---         go (NodeF i fs) indent =
---           -- fs :: [Int -> String]
---           let indent' = indent + 2
---               ss = map (\f -> f indent') fs
---               s = replicate indent ' ' ++ "* " ++ show i
---           in intercalate "\n" (s : ss)
+--         go (NodeF i fs) indent
+--             -- fs :: [Int -> String]
+--           = let indent' = indent + 2
+--                 ss = map (\f -> f indent') fs
+--                 s = replicate indent ' ' ++ "* " ++ show i
+--             in intercalate "\n" (s : ss)
 -- :}
 --
 -- >>> putStrLn $ pprint3 myTree
