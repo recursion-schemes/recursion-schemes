@@ -2,7 +2,7 @@ name:          recursion-schemes
 category:      Control, Recursion
 version:       5.2.2
 license:       BSD2
-cabal-version: >= 1.10
+cabal-version: >= 1.18
 license-file:  LICENSE
 author:        Edward A. Kmett
 maintainer:    "Samuel Gélineau" <gelisam@gmail.com>,
