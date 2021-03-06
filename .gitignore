@@ -2,7 +2,7 @@ dist/
 dist-newstyle/
 .stack-work/
 .hsenv/
-docs
+doc/
 wiki
 TAGS
 tags
