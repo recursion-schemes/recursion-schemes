@@ -147,6 +147,7 @@ import Data.Fix (Fix (..), unFix, Mu (..), Nu (..))
 -- >>> import Data.List.NonEmpty (NonEmpty (..))
 -- >>> import Data.Maybe (maybeToList)
 -- >>> import Data.Tree (Tree (..), drawTree)
+-- >>> import Numeric.Natural
 --
 -- >>> import Data.Functor.Base
 --
