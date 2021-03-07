@@ -136,6 +136,8 @@ import Data.Fix (Fix (..), unFix, Mu (..), Nu (..))
 -- $setup
 -- >>> :set -XDeriveFunctor -XScopedTypeVariables -XLambdaCase -XGADTs -XFlexibleContexts
 -- >>> import Control.Applicative (Const (..), Applicative (..))
+-- >>> import Control.Comonad
+-- >>> import Control.Comonad.Cofree (Cofree(..))
 -- >>> import Control.Monad (void)
 -- >>> import Control.Monad.Trans.Reader (Reader, ask, local, runReader)
 -- >>> import Data.Char (toUpper)
@@ -145,6 +147,7 @@ import Data.Fix (Fix (..), unFix, Mu (..), Nu (..))
 -- >>> import Data.List.NonEmpty (NonEmpty (..))
 -- >>> import Data.Maybe (maybeToList)
 -- >>> import Data.Tree (Tree (..), drawTree)
+-- >>> import Numeric.Natural
 --
 -- >>> import Data.Functor.Base
 --
@@ -271,10 +274,10 @@ class Functor (Base t) => Recursive t where
   --         go :: TreeF Int (Tree Int, Tree Int)
   --            -> Tree Int
   --         go (NodeF i []) = Node i [Node new []]
-  --         go (NodeF i ((_orig, recur) : tts)) =
-  --           -- tts :: [(Tree Int, Tree Int)]
-  --           let (origs, _recurs) = unzip tts
-  --           in Node i (recur : origs)
+  --         go (NodeF i ((_orig, recur) : tts))
+  --             -- tts :: [(Tree Int, Tree Int)]
+  --           = let (origs, _recurs) = unzip tts
+  --             in Node i (recur : origs)
   -- :}
   --
   -- >>> putStrLn $ pprint4 $ insertLeftmost 999 myTree
@@ -697,7 +700,99 @@ distGApoT
   -> f (ExceptT b m a)
 distGApoT g k = fmap ExceptT . k . fmap (distGApo g) . runExceptT
 
--- | Course-of-value iteration
+-- | A variant of 'cata' which includes the results of all the
+-- descendents, not just the direct children.
+--
+-- Like 'para', a sub-tree is provided for each recursive position. Each
+-- node in that sub-tree is annotated with the result for that
+-- descendent. The 'Cofree' type is used to add those annotations.
+--
+-- For our running example, let's recreate GitHub's directory compression
+-- algorithm. Notice that in [the repository for this
+-- package](https://github.com/recursion-schemes/recursion-schemes), GitHub
+-- displays @src\/Data\/Functor@, not @src@:
+--
+-- ![GitHub's code page](docs/github-compression.png)
+--
+-- GitHub does this because @src@ only contains one entry: @Data@. Similarly,
+-- @Data@ only contains one entry: @Functor@. @Functor@ contains several
+-- entries, so the compression stops there. This helps users get to the
+-- interesting folders more quickly.
+--
+-- Before we use 'histo', we need to define a helper function 'rollup'.
+-- It collects nodes until it reaches a node which doesn't have exactly one
+-- child. It also returns the labels of that node's children.
+--
+-- >>> :{
+-- let rollup :: [Cofree (TreeF node) label]
+--            -> ([node], [label])
+--     rollup [_ :< NodeF node cofrees] =
+--       let (nodes, label) = rollup cofrees
+--       in (node : nodes, label)
+--     rollup cofrees =
+--       ([], fmap extract cofrees)
+-- :}
+--
+-- >>> let foobar xs = 1 :< NodeF "foo" [2 :< NodeF "bar" xs]
+-- >>> rollup [foobar []]
+-- (["foo","bar"],[])
+-- >>> rollup [foobar [3 :< NodeF "baz" [], 4 :< NodeF "quux" []]]
+-- (["foo","bar"],[3,4])
+--
+-- The value @foobar []@ can be interpreted as the tree @NodeF "foo"
+-- [NodeF "bar" []]@, plus two annotations. The @"foo"@ node is annotated
+-- with @1@, while the @"bar"@ node is annotated with @2@. When we call
+-- 'histo' below, those annotations are recursive results of type @Int ->
+-- String@.
+--
+-- >>> :{
+-- let pprint5 :: Tree Int -> String
+--     pprint5 t = histo go t 0
+--       where
+--         go :: TreeF Int (Cofree (TreeF Int) (Int -> String))
+--            -> Int -> String
+--         go (NodeF node cofrees) indent
+--             -- cofrees :: [Cofree (TreeF Int) (Int -> String)]
+--             -- fs :: [Int -> String]
+--           = let indent' = indent + 2
+--                 (nodes, fs) = rollup cofrees
+--                 ss = map (\f -> f indent') fs
+--                 s = replicate indent ' '
+--                  ++ "* " ++ intercalate " / " (fmap show (node : nodes))
+--             in intercalate "\n" (s : ss)
+-- :}
+--
+-- >>> putStrLn $ pprint5 myTree
+-- * 0
+--   * 1
+--   * 2
+--   * 3 / 31 / 311
+--     * 3111
+--     * 3112
+--
+-- One common use for 'histo' is to cache the value computed for smaller
+-- sub-trees. In the Fibonacci example below, the recursive type is 'Natural',
+-- which is isomorphic to @[()]@. Our annotated sub-tree is thus isomorphic to
+-- a list of annotations. In our case, each annotation is the result which was
+-- computed for a smaller number. We thus have access to a list which caches
+-- all the Fibonacci numbers we have computed so far.
+--
+-- >>> :{
+-- let fib :: Natural -> Integer
+--     fib = histo go
+--       where
+--         go :: Maybe (Cofree Maybe Integer) -> Integer
+--         go Nothing = 1
+--         go (Just (_ :< Nothing)) = 1
+--         go (Just (fibNMinus1 :< Just (fibNMinus2 :< _)))
+--           = fibNMinus1 + fibNMinus2
+-- :}
+--
+-- >>> fmap fib [0..10]
+-- [1,1,2,3,5,8,13,21,34,55,89]
+--
+-- In general, @Cofree f a@ can be thought of as a cache that has the same
+-- shape as the recursive structure which was given as input.
 histo :: Recursive t => (Base t (Cofree (Base t) a) -> a) -> t -> a
 histo = gcata distHisto
 
@@ -838,12 +933,12 @@ zygoHistoPrepro f g t = gprepro (distZygoT f distHisto) g t
 --       where
 --         go :: TreeF Int (Int -> String)
 --            -> Int -> String
---         go (NodeF i fs) indent =
---           -- fs :: [Int -> String]
---           let indent' = indent + 2
---               ss = map (\f -> f indent') fs
---               s = replicate indent ' ' ++ "* " ++ show i
---           in intercalate "\n" (s : ss)
+--         go (NodeF i fs) indent
+--             -- fs :: [Int -> String]
+--           = let indent' = indent + 2
+--                 ss = map (\f -> f indent') fs
+--                 s = replicate indent ' ' ++ "* " ++ show i
+--             in intercalate "\n" (s : ss)
 -- :}
 --
 -- >>> putStrLn $ pprint3 myTree
