@@ -1,3 +1,8 @@
+
+## 5.2.2.1
+
+* Fix build issue regarding `Setup.hs`. See #120.
+
 ## 5.2.2
 * More Mendler-style recursion-schemes: `mpara`, `mzygo`, `mana`, `mapo`, and
   `mfutu`.
