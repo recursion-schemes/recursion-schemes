@@ -5,6 +5,7 @@ digraph {
   choose_either [label="I feel lucky!"];
   start_folds [label="Use a fold!"];
   start_unfolds [label="Use an unfold!"];
+  start_refolds [label="Use a refold!"];
   fold1,fold2,fold3,fold4,unfold1,unfold2,unfold3 [shape=diamond];
   fold1 [label="Do you only combine results\nfrom recursive calls?"];
   fold2 [label="Only from\nimmediate children?"];
@@ -29,6 +30,7 @@ digraph {
   decision1_1 -> choose_either [label=yes];
   decision1_1 -> start_folds [label=no];
   decision1_2 -> start_unfolds [label=yes];
+  decision1_2 -> start_refolds [label=no];
   choose_either -> start_folds;
   choose_either -> start_unfolds;
 
