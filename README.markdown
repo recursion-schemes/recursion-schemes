@@ -155,6 +155,12 @@ halves = ana go
 
 The [Data.Functor.Foldable](https://hackage.haskell.org/package/recursion-schemes/docs/Data-Functor-Foldable.html) module provides many more.
 
+## Flowchart for choosing a recursion-scheme
+
+![](./docs/flowchart.svg)
+
+In addition to the choices described by the flowchart, you can always choose to use a refold.
+
 ## Contributing
 
 Contributions and [bug reports](https://github.com/ekmett/recursion-schemes/issues/new) are welcome!
