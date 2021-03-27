@@ -1,0 +1,52 @@
+digraph {
+  decision1 [shape=diamond, label="Is your input\na recursive type?"];
+  decision1_1 [shape=diamond, label="Is your output\na recursive type?"];
+  decision1_2 [shape=diamond, label="Is your output\na recursive type?"];
+  choose_either [label="I feel lucky!"];
+  start_folds [label="Use a fold!"];
+  start_unfolds [label="Use an unfold!"];
+  fold1,fold2,fold3,fold4,unfold1,unfold2,unfold3 [shape=diamond];
+  fold1 [label="Do you only combine results\nfrom recursive calls?"];
+  fold2 [label="Only from\nimmediate children?"];
+  fold3 [label="Only that and examine\nthe original subtrees?"];
+  fold4 [label="What do you do to\neach subtree?"];
+  gcata [label="Write your own\nrecursion scheme\n(using gcata)!"];
+  cata [label="Use cata!"];
+  histo [label="Use histo!"];
+  zygo [label="Use zygo!"];
+  para [label="Use para!"];
+  unfold1 [label="Do you only generate subtrees\nby making recursive calls?"]
+  unfold2 [label="Do you only generate\n1 layer at a time?"]
+  unfold3 [label="Only that and by returning\npre-built subtrees?"]
+  ana [label="Use ana!"];
+  apo [label="Use apo!"];
+  futu [label="Use futu!"];
+  gana [label="Write your own\nrecursion scheme\n(using gana)!"];
+
+  start -> decision1;
+  decision1 -> decision1_1 [label=yes];
+  decision1 -> decision1_2 [label=no];
+  decision1_1 -> choose_either [label=yes];
+  decision1_1 -> start_folds [label=no];
+  decision1_2 -> start_unfolds [label=yes];
+  choose_either -> start_folds;
+  choose_either -> start_unfolds;
+
+  start_folds -> fold1;
+  fold1 -> fold2 [label="yes"]
+  fold1 -> fold3 [label="no"]
+  fold2 -> cata [label="yes"];
+  fold2 -> histo [label="no"];
+  fold3 -> fold4 [label="yes"];
+  fold3 -> gcata [label="no"];
+  fold4 -> zygo [label="Apply cata"];
+  fold4 -> para [label="Something else"];
+
+  start_unfolds -> unfold1;
+  unfold1 -> unfold2 [label="yes"];
+  unfold1 -> unfold3 [label="no"];
+  unfold2 -> ana [label="yes"];
+  unfold2 -> futu [label="no"];
+  unfold3 -> apo [label="yes"];
+  unfold3 -> gana [label="no"];
+}
