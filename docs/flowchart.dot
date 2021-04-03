@@ -1,12 +1,12 @@
 digraph {
-  decision1 [shape=diamond, label="Is your input\na recursive type?"];
-  decision1_1 [shape=diamond, label="Is your output\na recursive type?"];
-  decision1_2 [shape=diamond, label="Is your output\na recursive type?"];
+  decision1 [label="Is your input\na recursive type?"];
+  decision1_1 [label="Is your output\na recursive type?"];
+  decision1_2 [label="Is your output\na recursive type?"];
   choose_either [label="I feel lucky!"];
   start_folds [label="Use a fold!"];
   start_unfolds [label="Use an unfold!"];
   start_refolds [label="Use a refold!"];
-  fold1,fold2,fold3,fold4,unfold1,unfold2,unfold3 [shape=diamond];
+  decision0, decision1, decision1_1, decision1_2, expert_decision1, fold1,fold2,fold3,fold4,unfold1,unfold2,unfold3 [shape=diamond];
   fold1 [label="Do you only combine results\nfrom recursive calls?"];
   fold2 [label="Only from\nimmediate children?"];
   fold3 [label="Only that and examine\nthe original subtrees?"];
@@ -23,8 +23,12 @@ digraph {
   apo [label="Use apo!"];
   futu [label="Use futu!"];
   gana [label="Write your own\nrecursion scheme\n(using gana)!"];
+  decision0 [label="Do you know which shape your\nfunction's recursion will have?"];
+  expert_decision1 [label="What is the shape?"];
 
-  start -> decision1;
+  start -> decision0;
+  decision0 -> decision1 [label=no];
+  decision0 -> expert_decision1 [label=yes];
   decision1 -> decision1_1 [label=yes];
   decision1 -> decision1_2 [label=no];
   decision1_1 -> choose_either [label=yes];
@@ -51,4 +55,10 @@ digraph {
   unfold2 -> futu [label="no"];
   unfold3 -> apo [label="yes"];
   unfold3 -> gana [label="no"];
+
+  expert_decision1;
+  expert_decision1 -> start_folds [label="Same as input type"];
+  expert_decision1 -> start_unfolds [label="Same as output type"];
+  expert_decision1 -> start_refolds [label="Neither"];
+  decision1_2 -> expert_decision1 [style=invis];
 }
