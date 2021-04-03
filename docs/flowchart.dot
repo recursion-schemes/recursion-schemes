@@ -2,6 +2,9 @@ digraph {
   decision1 [label="Is your input\na recursive type?"];
   decision1_1 [label="Is your output\na recursive type?"];
   decision1_2 [label="Is your output\na recursive type?"];
+  decision1_2_yes [label="Yes"];
+  decision1_2_no [label="No"];
+  decision1_1_no [label="No"];
   choose_either [label="I feel lucky!"];
   start_folds [label="Use a fold!"];
   start_unfolds [label="Use an unfold!"];
@@ -25,18 +28,50 @@ digraph {
   gana [label="Write your own\nrecursion scheme\n(using gana)!"];
   decision0 [label="Do you know which shape your\nfunction's recursion will have?"];
   expert_decision1 [label="What is the shape?"];
+  same_as_input_type[label="Same as input type"];
+  same_as_output_type[label="Same as output type"];
+  neither[label="Neither"];
+  decision1_2_yes, decision1_2_no, decision1_1_no, same_as_input_type, same_as_output_type, neither [color=invis];
 
   start -> decision0;
   decision0 -> decision1 [label=no];
   decision0 -> expert_decision1 [label=yes];
-  decision1 -> decision1_1 [label=yes];
-  decision1 -> decision1_2 [label=no];
-  decision1_1 -> choose_either [label=yes];
-  decision1_1 -> start_folds [label=no];
-  decision1_2 -> start_unfolds [label=yes];
-  decision1_2 -> start_refolds [label=no];
+  decision1_1 -> decision1_1_no [dir=none];
+  decision1_2 -> decision1_2_yes [dir=none];
+  decision1_2 -> decision1_2_no [dir=none];
+
+  decision1_1_no -> start_folds [minlen=2];
+  decision1_2_yes -> start_unfolds [minlen=2];
+  decision1_2_no -> start_refolds [minlen=2];
+
+  subgraph cluster_beginner {
+    color=invis;
+    decision1 -> decision1_1 [label=yes];
+    decision1 -> decision1_2 [label=no];
+    decision1_1 -> choose_either [label=yes];
+    decision1_1_no;
+    decision1_2_yes;
+    decision1_2_no;
+  }
+
+  subgraph cluster_expert {
+    color=invis;
+    expert_decision1;
+    same_as_input_type;
+    same_as_output_type;
+    neither;
+  }
+
+  expert_decision1 -> same_as_input_type [dir=none];
+  same_as_input_type -> start_folds [minlen=2];
+  expert_decision1 -> same_as_output_type [dir=none];
+  same_as_output_type -> start_unfolds [minlen=2];
+  expert_decision1 -> neither [dir=none];
+  neither -> start_refolds [minlen=2];
+
   choose_either -> start_folds;
   choose_either -> start_unfolds;
+  choose_either -> start_refolds [style=invis];
 
   start_folds -> fold1;
   fold1 -> fold2 [label="yes"]
@@ -55,10 +90,4 @@ digraph {
   unfold2 -> futu [label="no"];
   unfold3 -> apo [label="yes"];
   unfold3 -> gana [label="no"];
-
-  expert_decision1;
-  expert_decision1 -> start_folds [label="Same as input type"];
-  expert_decision1 -> start_unfolds [label="Same as output type"];
-  expert_decision1 -> start_refolds [label="Neither"];
-  decision1_2 -> expert_decision1 [style=invis];
 }
