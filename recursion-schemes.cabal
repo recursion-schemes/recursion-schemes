@@ -83,7 +83,7 @@ library
 
   if flag(template-haskell)
     build-depends:
-      template-haskell >= 2.5.0.0 && < 2.18,
+      template-haskell >= 2.5.0.0 && < 2.19,
       base-orphans     >= 0.5.4   && < 0.9,
       th-abstraction   >= 0.4     && < 0.5
     exposed-modules:
