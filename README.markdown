@@ -158,6 +158,7 @@ The [Data.Functor.Foldable](https://hackage.haskell.org/package/recursion-scheme
 ## Flowchart for choosing a recursion-scheme
 
 ![](./docs/flowchart.svg)
+![](./docs/docs/flowchart.svg)
 
 In addition to the choices described by the flowchart, you can always choose to use a refold.
 
