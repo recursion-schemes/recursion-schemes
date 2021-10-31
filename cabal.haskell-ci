@@ -2,5 +2,3 @@ no-tests-no-benchmarks: False
 unconstrained:          False
 -- AMP, extensions, etc make it harder to run with older GHCs
 docspec:                >=7.10
-irc-channels:           irc.freenode.org#haskell-lens
-irc-if-in-origin-repo:  True

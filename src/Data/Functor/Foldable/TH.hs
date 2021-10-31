@@ -30,6 +30,8 @@ import Data.Functor.Foldable
 -- $setup
 -- >>> :set -XTemplateHaskell -XTypeFamilies -XDeriveTraversable -XScopedTypeVariables
 -- >>> import Data.Functor.Foldable
+-- >>> import Language.Haskell.TH (Q)
+-- >>> let asQ :: Q a -> Q a; asQ = id
 
 -- | Build base functor with a sensible default configuration.
 --
@@ -111,7 +113,7 @@ import Data.Functor.Foldable
 -- >>> :t AddF
 -- AddF :: r -> r -> ExprF a r
 --
--- >>> data Rose f a = Rose a (f (Rose f a)); makeBaseFunctor [d| instance Functor f => Recursive (Rose f a) |]
+-- >>> data Rose f a = Rose a (f (Rose f a)); makeBaseFunctor $ asQ [d| instance Functor f => Recursive (Rose f a) |]
 --
 -- >>> :t RoseF
 -- RoseF :: a -> f r -> RoseF f a r
