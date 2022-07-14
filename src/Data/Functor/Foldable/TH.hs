@@ -6,10 +6,14 @@ module Data.Functor.Foldable.TH
   , baseRulesType
   , baseRulesCon
   , baseRulesField
+  , baseRulesIncludeBase
+  , baseRulesIncludeRecursive
+  , baseRulesIncludeCorecursive
   ) where
 
-import Control.Applicative as A
 import Control.Monad
+import Control.Monad.Trans.Class (lift)
+import Control.Monad.Trans.Writer (execWriterT, tell)
 import Data.Traversable as T
 import Data.Functor.Identity
 import Language.Haskell.TH
@@ -125,10 +129,38 @@ import Data.Functor.Foldable
 class MakeBaseFunctor a where
     -- |
     -- @
+    -- 'makeRecursive' = 'makeRecursiveWith' 'baseRules'
+    -- @
+    makeRecursive :: a -> DecsQ
+    makeRecursive = makeRecursiveWith baseRules
+
+    -- |
+    -- @
+    -- 'makeCorecursive' = 'makeCorecursiveWith' 'baseRules'
+    -- @
+    makeCorecursive :: a -> DecsQ
+    makeCorecursive = makeCorecursiveWith baseRules
+
+    -- |
+    -- @
     -- 'makeBaseFunctor' = 'makeBaseFunctorWith' 'baseRules'
     -- @
     makeBaseFunctor :: a -> DecsQ
     makeBaseFunctor = makeBaseFunctorWith baseRules
+
+    -- | A variant of 'makeBaseFunctorWith' for types which should only have a
+    -- 'Recursive' instance, not a 'Corecursive' instance.
+    makeRecursiveWith :: BaseRules -> a -> DecsQ
+    makeRecursiveWith rules = makeBaseFunctorWith (rules
+                                { _baseRulesIncludeRecursive = True
+                                , _baseRulesIncludeCorecursive = False})
+
+    -- | A variant of 'makeBaseFunctorWith' for types which should only have a
+    -- 'Corecursive' instance, not a 'Recursive' instance.
+    makeCorecursiveWith :: BaseRules -> a -> DecsQ
+    makeCorecursiveWith rules = makeBaseFunctorWith (rules
+                                  { _baseRulesIncludeRecursive = False
+                                  , _baseRulesIncludeCorecursive = True})
 
     -- | Build base functor with a custom configuration.
     makeBaseFunctorWith :: BaseRules -> a -> DecsQ
@@ -150,7 +182,8 @@ instance MakeBaseFunctor Name where
 --
 -- This way we can provide a context for generated instances.
 -- Note that this instance's 'makeBaseFunctor' still generates all of
--- 'Base' type instance, 'Recursive' and 'Corecursive' instances.
+-- 'Base' type instance, 'Recursive' and 'Corecursive' instances if they are
+-- enabled in BaseRules.
 --
 instance MakeBaseFunctor Dec where
 #if MIN_VERSION_template_haskell(2,11,0)
@@ -171,17 +204,27 @@ instance MakeBaseFunctor Dec where
 
 -- | Rules of renaming data names
 data BaseRules = BaseRules
-    { _baseRulesType  :: Name -> Name
-    , _baseRulesCon   :: Name -> Name
-    , _baseRulesField :: Name -> Name
+    { _baseRulesType               :: Name -> Name
+    , _baseRulesCon                :: Name -> Name
+    , _baseRulesField              :: Name -> Name
+    , _baseRulesIncludeBase        :: Bool
+    , _baseRulesIncludeRecursive   :: Bool
+    , _baseRulesIncludeCorecursive :: Bool
     }
 
--- | Default 'BaseRules': append @F@ or @$@ to data type, constructors and field names.
+-- | Default 'BaseRules':
+--
+-- 1. Append @F@ or @$@ to data type, constructors and field names.
+-- 2. Generate everything we can: the Base Functor, the Recursive instance, and
+--    the Corecursive instance.
 baseRules :: BaseRules
 baseRules = BaseRules
-    { _baseRulesType  = toFName
-    , _baseRulesCon   = toFName
-    , _baseRulesField = toFName
+    { _baseRulesType               = toFName
+    , _baseRulesCon                = toFName
+    , _baseRulesField              = toFName
+    , _baseRulesIncludeBase        = True
+    , _baseRulesIncludeRecursive   = True
+    , _baseRulesIncludeCorecursive = True
     }
 
 -- | How to name the base functor type.
@@ -201,6 +244,18 @@ baseRulesCon f rules = (\x -> rules { _baseRulesCon = x }) <$> f (_baseRulesCon 
 -- Default is to append @F@ or @$@.
 baseRulesField :: Functor f => ((Name -> Name) -> f (Name -> Name)) -> BaseRules -> f BaseRules
 baseRulesField f rules = (\x -> rules { _baseRulesField = x }) <$> f (_baseRulesField rules)
+
+-- | Whether to generate the base functor type.
+baseRulesIncludeBase :: Functor f => (Bool -> f Bool) -> BaseRules -> f BaseRules
+baseRulesIncludeBase f rules = (\x -> rules { _baseRulesIncludeBase = x }) <$> f (_baseRulesIncludeBase rules)
+
+-- | Whether to generate the Recursive instance.
+baseRulesIncludeRecursive :: Functor f => (Bool -> f Bool) -> BaseRules -> f BaseRules
+baseRulesIncludeRecursive f rules = (\x -> rules { _baseRulesIncludeRecursive = x }) <$> f (_baseRulesIncludeRecursive rules)
+
+-- | Whether to generate the Corecursive instance.
+baseRulesIncludeCorecursive :: Functor f => (Bool -> f Bool) -> BaseRules -> f BaseRules
+baseRulesIncludeCorecursive f rules = (\x -> rules { _baseRulesIncludeCorecursive = x }) <$> f (_baseRulesIncludeCorecursive rules)
 
 toFName :: Name -> Name
 toFName = mkName . f . nameBase
@@ -242,84 +297,90 @@ makePrimForDI' :: BaseRules
                -> Bool -> Name -> [TyVarBndrUnit]
                -> [ConstructorInfo] -> DecsQ
 makePrimForDI' rules mkInstance' isNewtype tyName vars cons = do
-    -- variable parameters
-    let vars' = map VarT (typeVars vars)
-    -- Name of base functor
-    let tyNameF = _baseRulesType rules tyName
-    -- Recursive type
-    let s = conAppsT tyName vars'
-    -- Additional argument
-    rName <- newName "r"
-    let r = VarT rName
-    -- Vars
-    let varsF = vars ++ [plainTV rName]
+    execWriterT $ do
+      -- variable parameters
+      let vars' = map VarT (typeVars vars)
+      -- Name of base functor
+      let tyNameF = _baseRulesType rules tyName
+      -- Recursive type
+      let s = conAppsT tyName vars'
+      -- #33
+      cons' <- lift $ traverse (conTypeTraversal resolveTypeSynonyms) cons
 
-    -- #33
-    cons' <- traverse (conTypeTraversal resolveTypeSynonyms) cons
-    let consF
-          = toCon
-          . conNameMap (_baseRulesCon rules)
-          . conFieldNameMap (_baseRulesField rules)
-          . conTypeMap (substType s r)
-          <$> cons'
+      when (_baseRulesIncludeBase rules) $ do
+        -- Additional argument
+        rName <- lift $ newName "r"
+        let r = VarT rName
+        -- Vars
+        let varsF = vars ++ [plainTV rName]
 
-    -- Data definition
+        let consF
+              = toCon
+              . conNameMap (_baseRulesCon rules)
+              . conFieldNameMap (_baseRulesField rules)
+              . conTypeMap (substType s r)
+              <$> cons'
+
+        -- Data definition
 #if MIN_VERSION_template_haskell(2,12,0)
-    derivStrat <- do
-      e <- isExtEnabled DerivingStrategies
-      pure $ if e then Just StockStrategy else Nothing
+        derivStrat <- lift $ do
+          e <- isExtEnabled DerivingStrategies
+          pure $ if e then Just StockStrategy else Nothing
 #endif
-    let dataDec = case consF of
+        let dataDec = case consF of
 #if MIN_VERSION_template_haskell(2,11,0)
-            [conF] | isNewtype ->
-                NewtypeD [] tyNameF varsF Nothing conF deriveds
-            _ ->
-                DataD [] tyNameF varsF Nothing consF deriveds
+                [conF] | isNewtype ->
+                    NewtypeD [] tyNameF varsF Nothing conF deriveds
+                _ ->
+                    DataD [] tyNameF varsF Nothing consF deriveds
 #else
-            [conF] | isNewtype ->
-                NewtypeD [] tyNameF varsF conF deriveds
-            _ ->
-                DataD [] tyNameF varsF consF deriveds
+                [conF] | isNewtype ->
+                    NewtypeD [] tyNameF varsF conF deriveds
+                _ ->
+                    DataD [] tyNameF varsF consF deriveds
 #endif
-          where
-            deriveds =
+              where
+                deriveds =
 #if MIN_VERSION_template_haskell(2,12,0)
-              [DerivClause derivStrat
-                [ ConT functorTypeName
-                , ConT foldableTypeName
-                , ConT traversableTypeName ]]
+                  [DerivClause derivStrat
+                    [ ConT functorTypeName
+                    , ConT foldableTypeName
+                    , ConT traversableTypeName ]]
 #elif MIN_VERSION_template_haskell(2,11,0)
-              [ ConT functorTypeName
-              , ConT foldableTypeName
-              , ConT traversableTypeName ]
+                  [ ConT functorTypeName
+                  , ConT foldableTypeName
+                  , ConT traversableTypeName ]
 #else
-              [functorTypeName, foldableTypeName, traversableTypeName]
+                  [functorTypeName, foldableTypeName, traversableTypeName]
 #endif
+        tell [dataDec]
 
-    -- type instance Base
-    baseDec <- tySynInstDCompat baseTypeName Nothing
-                                [pure s] (pure $ conAppsT tyNameF vars')
+        -- type instance Base
+        baseDec <- lift $ tySynInstDCompat baseTypeName Nothing
+                                           [pure s] (pure $ conAppsT tyNameF vars')
+        tell [baseDec]
 
-    let mkInstance :: Name -> [Dec] -> Dec
-        mkInstance = case mkInstance' of
-            Just f  -> f
-            Nothing -> \n ->
+      let mkInstance :: Name -> [Dec] -> Dec
+          mkInstance = case mkInstance' of
+              Just f  -> f
+              Nothing -> \n ->
 #if MIN_VERSION_template_haskell(2,11,0)
                 InstanceD Nothing [] (ConT n `AppT` s)
 #else
                 InstanceD [] (ConT n `AppT` s)
 #endif
 
-    -- instance Recursive
-    projDec <- FunD projectValName <$> mkMorphism id (_baseRulesCon rules) cons'
-    let recursiveDec = mkInstance recursiveTypeName [projDec]
+      when (_baseRulesIncludeRecursive rules) $ do
+        -- instance Recursive
+        projDec <- lift $ FunD projectValName <$> mkMorphism id (_baseRulesCon rules) cons'
+        let recursiveDec = mkInstance recursiveTypeName [projDec]
+        tell [recursiveDec]
 
-    -- instance Corecursive
-    embedDec <- FunD embedValName <$> mkMorphism (_baseRulesCon rules) id cons'
-    let corecursiveDec = mkInstance corecursiveTypeName [embedDec]
-
-    -- Combine
-    A.pure [dataDec, baseDec, recursiveDec, corecursiveDec]
+      when (_baseRulesIncludeCorecursive rules) $ do
+        -- instance Corecursive
+        embedDec <- lift $ FunD embedValName <$> mkMorphism (_baseRulesCon rules) id cons'
+        let corecursiveDec = mkInstance corecursiveTypeName [embedDec]
+        tell [corecursiveDec]
 
 -- | makes clauses to rename constructors
 mkMorphism

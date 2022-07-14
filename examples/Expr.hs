@@ -81,6 +81,16 @@ type Forest a = [Tree a]
 
 makeBaseFunctor ''Tree
 
+-- Test #133
+data FiniteList a = FNil | FCons a !(FiniteList a)
+  deriving (Show)
+
+makeRecursive ''FiniteList
+
+data Stream a = SCons a (Stream a)
+
+makeCorecursive ''Stream
+
 main :: IO ()
 main = do
     let expr2 = ana divCoalg 55 :: Expr Int
@@ -96,6 +106,12 @@ main = do
 
     let expr4 = Node 5 [Node 6 [Node 7 []], Node 8 [Node 9 []]]
     35 @=? cata treeAlg expr4
+
+    let expr5 = FCons 5 (FCons 6 (FCons 7 (FCons 8 (FCons 9 FNil))))
+    35 @=? cata finiteListAlg expr5
+
+    let expr6 = ana (SConsF 1) ()
+    [1,1,1] @=? takeStream 3 expr6
   where
     -- Type signatures to test name generation
     evalAlg :: ExprF Int Int -> Int
@@ -122,3 +138,11 @@ main = do
 
     treeAlg :: TreeF Int Int -> Int
     treeAlg (NodeF r f) = r + sum f
+
+    finiteListAlg :: FiniteListF Int Int -> Int
+    finiteListAlg (FConsF x r) = x + r
+    finiteListAlg FNilF = 0
+
+    takeStream :: Int -> Stream Int -> [Int]
+    takeStream 0 _ = []
+    takeStream n (SCons x xs) = x : takeStream (n-1) xs
