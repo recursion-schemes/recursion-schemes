@@ -11,7 +11,7 @@ module Data.Functor.Foldable.TH
   , baseRulesIncludeCorecursive
   ) where
 
-import Control.Applicative (pure, (<$>))  -- required before ghc-7.10
+import Control.Applicative (Applicative, pure, (<$>))  -- required before ghc-7.10
 import Control.Monad
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Writer (execWriterT, tell)
