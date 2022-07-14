@@ -246,14 +246,20 @@ baseRulesField :: Functor f => ((Name -> Name) -> f (Name -> Name)) -> BaseRules
 baseRulesField f rules = (\x -> rules { _baseRulesField = x }) <$> f (_baseRulesField rules)
 
 -- | Whether to generate the base functor type.
+--
+-- Default is to generate it.
 baseRulesIncludeBase :: Functor f => (Bool -> f Bool) -> BaseRules -> f BaseRules
 baseRulesIncludeBase f rules = (\x -> rules { _baseRulesIncludeBase = x }) <$> f (_baseRulesIncludeBase rules)
 
 -- | Whether to generate the Recursive instance.
+--
+-- Default is to generate it.
 baseRulesIncludeRecursive :: Functor f => (Bool -> f Bool) -> BaseRules -> f BaseRules
 baseRulesIncludeRecursive f rules = (\x -> rules { _baseRulesIncludeRecursive = x }) <$> f (_baseRulesIncludeRecursive rules)
 
 -- | Whether to generate the Corecursive instance.
+--
+-- Default is to generate it.
 baseRulesIncludeCorecursive :: Functor f => (Bool -> f Bool) -> BaseRules -> f BaseRules
 baseRulesIncludeCorecursive f rules = (\x -> rules { _baseRulesIncludeCorecursive = x }) <$> f (_baseRulesIncludeCorecursive rules)
 
