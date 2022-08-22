@@ -197,7 +197,7 @@ type family Base t :: * -> *
 -- | A recursive datatype which can be unrolled one recursion layer at a time.
 --
 -- For example, a value of type @[a]@ can be unrolled into a @'ListF' a [a]@.
--- Ifthat unrolled value is a 'Cons', it contains another @[a]@ which can be
+-- If that unrolled value is a 'Cons', it contains another @[a]@ which can be
 -- unrolled as well, and so on.
 --
 -- Typically, 'Recursive' types also have a 'Corecursive' instance, in which
