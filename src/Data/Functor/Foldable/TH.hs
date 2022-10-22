@@ -1,4 +1,9 @@
 {-# LANGUAGE CPP, PatternGuards, Rank2Types #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TypeFamilies #-}
+#if __GLASGOW_HASKELL__ < 710
+{-# LANGUAGE OverlappingInstances #-}
+#endif
 module Data.Functor.Foldable.TH
   ( MakeBaseFunctor(..)
   , BaseRules
@@ -30,8 +35,6 @@ import Data.Functor.Foldable
 -- $setup
 -- >>> :set -XTemplateHaskell -XTypeFamilies -XDeriveTraversable -XScopedTypeVariables
 -- >>> import Data.Functor.Foldable
--- >>> import Language.Haskell.TH (Q)
--- >>> let asQ :: Q a -> Q a; asQ = id
 
 -- | Build base functor with a sensible default configuration.
 --
@@ -113,7 +116,7 @@ import Data.Functor.Foldable
 -- >>> :t AddF
 -- AddF :: r -> r -> ExprF a r
 --
--- >>> data Rose f a = Rose a (f (Rose f a)); makeBaseFunctor $ asQ [d| instance Functor f => Recursive (Rose f a) |]
+-- >>> data Rose f a = Rose a (f (Rose f a)); makeBaseFunctor [d| instance Functor f => Recursive (Rose f a) |]
 --
 -- >>> :t RoseF
 -- RoseF :: a -> f r -> RoseF f a r
@@ -133,11 +136,15 @@ class MakeBaseFunctor a where
     -- | Build base functor with a custom configuration.
     makeBaseFunctorWith :: BaseRules -> a -> DecsQ
 
-instance MakeBaseFunctor a => MakeBaseFunctor [a] where
-    makeBaseFunctorWith rules a = fmap concat (T.traverse (makeBaseFunctorWith rules) a)
+instance {-# OVERLAPPING #-} MakeBaseFunctor [Name] where
+    makeBaseFunctorWith rules ns = fmap concat $
+      T.traverse (makeBaseFunctorWith rules) ns
 
-instance MakeBaseFunctor a => MakeBaseFunctor (Q a) where
-    makeBaseFunctorWith rules a = makeBaseFunctorWith rules =<< a
+instance (m ~ Q, x ~ [Dec]) => MakeBaseFunctor (m x) where
+    makeBaseFunctorWith rules a = do
+      user_decs <- a
+      decs <- T.traverse (makeBaseFunctorWith rules) user_decs
+      pure (concat decs)
 
 instance MakeBaseFunctor Name where
     makeBaseFunctorWith rules name = reifyDatatype name >>= makePrimForDI rules Nothing
