@@ -81,6 +81,15 @@ type Forest a = [Tree a]
 
 makeBaseFunctor ''Tree
 
+data Rose f a = Rose [f (Rose f a)]
+data Qose f a = Qose [f (Qose f a)]
+
+-- Multiple declarations are accepted.
+makeBaseFunctor [d|
+  instance Functor f => Recursive (Rose f a)
+  instance Functor f => Recursive (Qose f a)
+  |]
+
 main :: IO ()
 main = do
     let expr2 = ana divCoalg 55 :: Expr Int
