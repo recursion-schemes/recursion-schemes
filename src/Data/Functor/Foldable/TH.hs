@@ -21,6 +21,7 @@ import Language.Haskell.TH
 import Language.Haskell.TH.Datatype as TH.Abs
 import Language.Haskell.TH.Datatype.TyVarBndr
 import Language.Haskell.TH.Syntax (mkNameG_tc, mkNameG_v)
+import qualified Language.Haskell.TH.PprLib as Ppr
 import Data.Char (GeneralCategory (..), generalCategory)
 import Data.Orphans ()
 #ifndef CURRENT_PACKAGE_KEY
@@ -80,8 +81,15 @@ import Data.Functor.Foldable
 -- as we don't try to do better than
 -- <https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/glasgow_exts.html#deriving-functor-instances GHC's DeriveFunctor>.
 --
--- Allowing 'makeBaseFunctor' to take both 'Name's and 'Dec's as an argument is why it exists as a method in a type class.
--- For trickier data-types, like rose-tree (see also 'Cofree'):
+-- 'makeBaseFunctor' can accept any of the following:
+--
+-- 1. A name
+-- 2. A list of names
+-- 3. A single declaration quote containing one or more empty instances
+--
+-- Allowing 'makeBaseFunctor' to take both 'Name's and 'Dec's is why it exists
+-- as a method in a type class.  For trickier data-types, like rose-tree (see
+-- also 'Cofree'):
 --
 -- @
 -- data Rose f a = Rose a (f (Rose f a))
@@ -140,31 +148,38 @@ instance {-# OVERLAPPING #-} MakeBaseFunctor [Name] where
     makeBaseFunctorWith rules ns = fmap concat $
       T.traverse (makeBaseFunctorWith rules) ns
 
-instance (m ~ Q, x ~ [Dec]) => MakeBaseFunctor (m x) where
-    makeBaseFunctorWith rules a = do
-      user_decs <- a
-      decs <- T.traverse (makeBaseFunctorWith rules) user_decs
-      pure (concat decs)
-
 instance MakeBaseFunctor Name where
     makeBaseFunctorWith rules name = reifyDatatype name >>= makePrimForDI rules Nothing
 
--- | Expects declarations of 'Recursive' or 'Corecursive' instances, e.g.
+-- | Expects one or more declarations of 'Recursive' or 'Corecursive' instances, e.g.
 --
 -- @
 -- makeBaseFunctor [d| instance Functor f => Recursive (Rose f a) |]
+-- makeBaseFunctor [d|
+--   instance C a => Recursive (Foo a b)
+--   instance D a => Corecursive (Bar a b)
+--   |]
 -- @
 --
 -- This way we can provide a context for generated instances.
 -- Note that this instance's 'makeBaseFunctor' still generates all of
--- 'Base' type instance, 'Recursive' and 'Corecursive' instances.
---
-instance MakeBaseFunctor Dec where
+-- 'Base' type instance, 'Recursive' and 'Corecursive' instances,
+-- whether the user supplies a 'Recursive' or 'Corecursive' declaration.
+instance (m ~ Q, x ~ [Dec]) => MakeBaseFunctor (m x) where
+    makeBaseFunctorWith rules a = do
+      user_decs <- a
+      decs <- T.traverse (makeBaseFunctorDecWith rules) user_decs
+      pure (concat decs)
+
+-- The underlying implementation of MakeBaseFuctor (Q [Dec])
+makeBaseFunctorDecWith :: BaseRules -> Dec -> DecsQ
+makeBaseFunctorDecWith = go
+  where
 #if MIN_VERSION_template_haskell(2,11,0)
-    makeBaseFunctorWith rules (InstanceD overlaps ctx classHead []) = do
+    go rules arg@(InstanceD overlaps ctx classHead []) = do
         let instanceFor = InstanceD overlaps ctx
 #else
-    makeBaseFunctorWith rules (InstanceD ctx classHead []) = do
+    go rules arg@(InstanceD ctx classHead []) = do
         let instanceFor = InstanceD ctx
 #endif
         case classHead of
@@ -172,9 +187,17 @@ instance MakeBaseFunctor Dec where
               name <- headOfType t
               di <- reifyDatatype name
               makePrimForDI rules (Just $ \n -> instanceFor (ConT n `AppT` t)) di
-          _ -> fail $ "makeBaseFunctor: expected an instance head like `ctx => Recursive (T a b ...)`, got " ++ show classHead
+          _ -> err arg
+    go _ arg = err arg
 
-    makeBaseFunctorWith _ _ = fail "makeBaseFunctor(With): expected an empty instance declaration"
+    -- This pretty printing is a bit hacky. Can we do better?
+    err arg = fail . show $ Ppr.sep
+      [ Ppr.space
+      , Ppr.hang (Ppr.text "makeBaseFunctor: expected an instance head like") 4 $
+          Ppr.text "`[d| instance ctx => Recursive (T a b ...) |]'"
+      , Ppr.hang (Ppr.text "got") 4 $ Ppr.hcat
+          [Ppr.text "`", ppr arg, Ppr.text "'"]
+      ]
 
 -- | Rules of renaming data names
 data BaseRules = BaseRules
