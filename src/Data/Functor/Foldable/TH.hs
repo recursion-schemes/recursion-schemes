@@ -1,9 +1,6 @@
 {-# LANGUAGE CPP, PatternGuards, Rank2Types #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeFamilies #-}
-#if __GLASGOW_HASKELL__ < 710
-{-# LANGUAGE OverlappingInstances #-}
-#endif
 module Data.Functor.Foldable.TH
   ( MakeBaseFunctor(..)
   , BaseRules
@@ -81,11 +78,10 @@ import Data.Functor.Foldable
 -- as we don't try to do better than
 -- <https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/glasgow_exts.html#deriving-functor-instances GHC's DeriveFunctor>.
 --
--- 'makeBaseFunctor' can accept any of the following:
+-- 'makeBaseFunctor' can accept either of the following:
 --
 -- 1. A name
--- 2. A list of names
--- 3. A single declaration quote containing one or more empty instances
+-- 2. A single declaration quote containing one or more empty instances
 --
 -- Allowing 'makeBaseFunctor' to take both 'Name's and 'Dec's is why it exists
 -- as a method in a type class.  For trickier data-types, like rose-tree (see
@@ -143,10 +139,6 @@ class MakeBaseFunctor a where
 
     -- | Build base functor with a custom configuration.
     makeBaseFunctorWith :: BaseRules -> a -> DecsQ
-
-instance {-# OVERLAPPING #-} MakeBaseFunctor [Name] where
-    makeBaseFunctorWith rules ns = fmap concat $
-      T.traverse (makeBaseFunctorWith rules) ns
 
 instance MakeBaseFunctor Name where
     makeBaseFunctorWith rules name = reifyDatatype name >>= makePrimForDI rules Nothing

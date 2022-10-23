@@ -84,14 +84,11 @@ makeBaseFunctor ''Tree
 data Rose f a = Rose [f (Rose f a)]
 data Qose f a = Qose [f (Qose f a)]
 
+-- Multiple declarations are accepted.
 makeBaseFunctor [d|
   instance Functor f => Recursive (Rose f a)
   instance Functor f => Recursive (Qose f a)
   |]
-
-data Wonkazoidal = Wonk
-data Underzoidal = Underwonk
-makeBaseFunctor [''Wonkazoidal, ''Underzoidal]
 
 main :: IO ()
 main = do
