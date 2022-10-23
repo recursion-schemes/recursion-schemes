@@ -1,3 +1,9 @@
+## ???
+
+* Improve type inference for `makeBaseFunctor` in recent GHC versions, and
+  remove its accidental ability to accept things like lists of declaration
+  quotes. Document what it can accept, and add test cases.
+
 ## 5.2.2.2
 
 * Support GHC-9.0 and GHC-9.2
