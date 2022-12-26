@@ -1,3 +1,8 @@
+## 5.2.2.3
+
+* Workaround for https://gitlab.haskell.org/ghc/ghc/-/issues/18320, which was
+  preventing code calling makeBaseFunctor from being profiled.
+
 ## 5.2.2.2
 
 * Support GHC-9.0 and GHC-9.2
