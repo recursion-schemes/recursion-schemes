@@ -1,4 +1,13 @@
 {-# LANGUAGE CPP, PatternGuards, Rank2Types #-}
+-- This OPTIONS_GHC line is a workaround for
+-- https://gitlab.haskell.org/ghc/ghc/-/issues/18320, a bug which only occurs
+-- when running specific TemplateHaskell code while both profiling and
+-- optimisations are enabled. The code in this file triggers the bug, so until
+-- it is fixed, we work around the issue by disabling optimisations in this
+-- file. The code in this file only runs at compile-time, the code _generated_
+-- by makeBaseFunctor will still get optimized if the file which calls
+-- makeBaseFunctor is optimized.
+{-# OPTIONS_GHC -O0 #-}
 module Data.Functor.Foldable.TH
   ( MakeBaseFunctor(..)
   , BaseRules
