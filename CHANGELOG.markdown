@@ -17,7 +17,7 @@
 * `makeBaseFunctor` no longer generates warnings when combined with
   DerivingStrategies.
 
-## 5.2.1 [2020.10.04]
+## 5.2.1 [2020-10-04]
 * Allow building with `template-haskell-2.17.0.0` (GHC 9.0).
 
 ## 5.2
@@ -29,7 +29,7 @@
   and `Corecursive` instances.
 * Depend on `data-fix` package for fixed point types.
 
-## 5.1.3 [2019.04.26]
+## 5.1.3 [2019-04-26]
 * Support `th-abstraction-0.3.0.0` or later.
 
 ## 5.1.2
@@ -54,7 +54,7 @@
 * Add `hoist`, `hoistMu` and `hoistNu`
 * Add `transverse` and `cataA`
 
-## 5.0.3 [2018.07.01]
+## 5.0.3 [2018-07-01]
 * Make the Template Haskell machinery look through type synonyms.
 * Avoid incurring some dependencies when using recent GHCs.
 
