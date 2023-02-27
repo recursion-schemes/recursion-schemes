@@ -229,17 +229,22 @@ makePrimForDI rules mkInstance'
                 , datatypeInstTypes = instTys
                 , datatypeCons      = cons
                 , datatypeVariant   = variant }) = do
-    when isDataFamInstance $
-      fail "makeBaseFunctor: Data families are currently not supported."
+    checkAllowed
     makePrimForDI' rules mkInstance'
                    (variant == Newtype) tyName
                    (map toTyVarBndr instTys) cons
   where
-    isDataFamInstance = case variant of
-                          DataInstance    -> True
-                          NewtypeInstance -> True
-                          Datatype        -> False
-                          Newtype         -> False
+    checkAllowed =
+      case variant of
+        Datatype        -> pure ()
+        Newtype         -> pure ()
+        DataInstance    -> dataFamilyError
+        NewtypeInstance -> dataFamilyError
+#if MIN_VERSION_th_abstraction(0,5,0)
+        TH.Abs.TypeData -> fail "makeBaseFunctor: `type data` declarations are not supported."
+#endif
+
+    dataFamilyError = fail "makeBaseFunctor: Data families are currently not supported."
 
     toTyVarBndr :: Type -> TyVarBndrUnit
     toTyVarBndr (VarT n)          = plainTV n
