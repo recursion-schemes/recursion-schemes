@@ -1,3 +1,6 @@
+## 5.2.2.4 [2023-02-27]
+* Support `th-abstraction-0.3.0.0` or later.
+
 ## 5.2.2.3
 
 * Workaround for https://gitlab.haskell.org/ghc/ghc/-/issues/18320, which was
