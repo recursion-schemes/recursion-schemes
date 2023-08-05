@@ -26,7 +26,6 @@ import Language.Haskell.TH.Datatype as TH.Abs
 import Language.Haskell.TH.Datatype.TyVarBndr
 import Language.Haskell.TH.Syntax (mkNameG_tc, mkNameG_v)
 import Data.Char (GeneralCategory (..), generalCategory)
-import Data.Orphans ()
 #ifndef CURRENT_PACKAGE_KEY
 import Data.Version (showVersion)
 import Paths_recursion_schemes (version)
