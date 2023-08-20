@@ -35,6 +35,10 @@ import Paths_recursion_schemes (version)
 import Data.Functor.Foldable
 #endif
 
+#if !MIN_VERSION_template_haskell(2,21,0) && !MIN_VERSION_th_abstraction(0,6,0)
+type TyVarBndrVis = TyVarBndrUnit
+#endif
+
 -- $setup
 -- >>> :set -XTemplateHaskell -XTypeFamilies -XDeriveTraversable -XScopedTypeVariables
 -- >>> import Data.Functor.Foldable
@@ -245,14 +249,15 @@ makePrimForDI rules mkInstance'
 
     dataFamilyError = fail "makeBaseFunctor: Data families are currently not supported."
 
-    toTyVarBndr :: Type -> TyVarBndrUnit
+    toTyVarBndr :: Type -> TyVarBndrVis
     toTyVarBndr (VarT n)          = plainTV n
     toTyVarBndr (SigT (VarT n) k) = kindedTV n k
     toTyVarBndr _                 = error "toTyVarBndr"
 
 makePrimForDI' :: BaseRules
                -> Maybe (Name -> [Dec] -> Dec) -- ^ make instance
-               -> Bool -> Name -> [TyVarBndrUnit]
+               -> Bool -> Name
+               -> [TyVarBndrVis]
                -> [ConstructorInfo] -> DecsQ
 makePrimForDI' rules mkInstance' isNewtype tyName vars cons = do
     -- variable parameters
