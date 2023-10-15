@@ -1,8 +1,15 @@
+## 5.2.2.5 [2023-10-14]
+
+* Support GHC-9.6 and GHC-9.8
+* Support `th-abstraction-0.6.0.0` or later.
+
 ## 5.2.2.4 [2023-02-27]
-* Support `th-abstraction-0.3.0.0` or later.
+
+* Support `th-abstraction-0.5.0.0` or later.
 
 ## 5.2.2.3
 
+* Support GHC-9.4
 * Workaround for https://gitlab.haskell.org/ghc/ghc/-/issues/18320, which was
   preventing code calling makeBaseFunctor from being profiled.
 
