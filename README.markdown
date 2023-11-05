@@ -33,10 +33,10 @@ product = foldr (*) 1
 
 ```haskell
 depth :: Tree a -> Int
-depth (Node _ subTrees) = 1 + maximum subTrees
+depth (Node _ subTrees) = 1 + maximum (map depth subTrees)
 
 size :: Tree a -> Int
-size (Node _ subTrees) = 1 + sum subTrees
+size (Node _ subTrees) = 1 + sum (map size subTrees)
 ```
 
 It is not possible to use `foldr` to simplify `depth`. Conceptually, `foldr` is flattening all the elements of the tree into a list before combining them with the binary function. This does not work for `depth` because it needs to examine the structure of the tree, which `foldr` flattened away.
