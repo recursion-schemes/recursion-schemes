@@ -1,4 +1,7 @@
 {-# LANGUAGE CPP, PatternGuards, Rank2Types #-}
+#if __GLASGOW_HASKELL__ >= 800
+{-# LANGUAGE TemplateHaskellQuotes #-}
+#endif
 -- This OPTIONS_GHC line is a workaround for
 -- https://gitlab.haskell.org/ghc/ghc/-/issues/18320, a bug which only occurs
 -- when running specific TemplateHaskell code while both profiling and
@@ -511,6 +514,8 @@ isPuncChar c = c `elem` ",;()[]{}`"
 -- By manually generating these names we avoid needing to use the
 -- TemplateHaskell language extension when compiling this library.
 -- This allows the library to be used in stage1 cross-compilers.
+-- In GHC 8.0 and newer, we use TemplateHaskellQuotes for names of
+-- things in base, to avoid unnecessary tight coupling (issue #160).
 
 rsPackageKey :: String
 #ifdef CURRENT_PACKAGE_KEY
@@ -540,11 +545,13 @@ projectValName = mkRsName_v "Data.Functor.Foldable" "project"
 embedValName :: Name
 embedValName = mkRsName_v "Data.Functor.Foldable" "embed"
 
-functorTypeName :: Name
+functorTypeName, foldableTypeName, traversableTypeName :: Name
+#if __GLASGOW_HASKELL__ >= 800
+functorTypeName = ''Functor
+foldableTypeName = ''Foldable
+traversableTypeName = ''Traversable
+#else
 functorTypeName = mkNameG_tc "base" "GHC.Base" "Functor"
-
-foldableTypeName :: Name
 foldableTypeName = mkNameG_tc "base" "Data.Foldable" "Foldable"
-
-traversableTypeName :: Name
 traversableTypeName = mkNameG_tc "base" "Data.Traversable" "Traversable"
+#endif
