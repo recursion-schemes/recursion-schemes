@@ -1,16 +1,8 @@
-{-# LANGUAGE CPP, TypeFamilies, Rank2Types, FlexibleContexts, FlexibleInstances, GADTs, StandaloneDeriving, UndecidableInstances #-}
-#include "recursion-schemes-common.h"
-
-#ifdef __GLASGOW_HASKELL__
+{-# LANGUAGE TypeFamilies, Rank2Types, FlexibleContexts, FlexibleInstances, GADTs, StandaloneDeriving, UndecidableInstances #-}
 {-# LANGUAGE DeriveDataTypeable #-}
-#if __GLASGOW_HASKELL__ >= 800
 {-# LANGUAGE ConstrainedClassMethods #-}
-#endif
-#if HAS_GENERIC
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE ScopedTypeVariables, DefaultSignatures, MultiParamTypeClasses, TypeOperators #-}
-#endif
-#endif
 
 -----------------------------------------------------------------------------
 -- |
@@ -120,11 +112,7 @@ import Control.Arrow
 import Data.Functor.Compose (Compose(..))
 import Data.List.NonEmpty(NonEmpty((:|)), nonEmpty, toList)
 import Data.Tree (Tree (..))
-#ifdef __GLASGOW_HASKELL__
-#if HAS_GENERIC
 import GHC.Generics (Generic (..), M1 (..), V1, U1, K1 (..), (:+:) (..), (:*:) (..))
-#endif
-#endif
 import Numeric.Natural
 import Prelude
 
@@ -208,10 +196,8 @@ class Functor (Base t) => Recursive t where
   -- >>> project [1,2,3]
   -- Cons 1 [2,3]
   project :: t -> Base t t
-#ifdef HAS_GENERIC
   default project :: (Generic t, Generic (Base t t), GCoerce (Rep t) (Rep (Base t t))) => t -> Base t t
   project = to . gcoerce . from
-#endif
 
   -- | An alias for 'fold'.
   --
@@ -336,10 +322,8 @@ class Functor (Base t) => Corecursive t where
   -- >>> embed (Cons 1 [2,3])
   -- [1,2,3]
   embed :: Base t t -> t
-#ifdef HAS_GENERIC
   default embed :: (Generic t, Generic (Base t t), GCoerce (Rep (Base t t)) (Rep t)) => Base t t -> t
   embed = to . gcoerce . from
-#endif
 
   -- | An alias for 'unfold'.
   ana

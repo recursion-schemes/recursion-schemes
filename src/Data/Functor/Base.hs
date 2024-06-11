@@ -1,12 +1,5 @@
-{-# LANGUAGE CPP #-}
-#include "recursion-schemes-common.h"
-
-#ifdef __GLASGOW_HASKELL__
-{-# LANGUAGE DeriveDataTypeable #-}
-#if HAS_GENERIC
 {-# LANGUAGE DeriveGeneric #-}
-#endif
-#endif
+{-# LANGUAGE DeriveTraversable #-}
 
 -- | Base Functors for standard types not already expressed as a fixed point.
 module Data.Functor.Base
@@ -15,24 +8,14 @@ module Data.Functor.Base
   , TreeF (..), ForestF,
   ) where
 
-#ifdef __GLASGOW_HASKELL__
-import Data.Data (Typeable)
-#if HAS_GENERIC
-import GHC.Generics (Generic)
-#endif
-#if HAS_GENERIC1
-import GHC.Generics (Generic1)
-#endif
-#endif
+import GHC.Generics (Generic, Generic1)
 
 import Control.Applicative
 import Data.Monoid
 
 import Data.Functor.Classes
   ( Eq1(..), Ord1(..), Show1(..), Read1(..)
-#ifdef LIFTED_FUNCTOR_CLASSES
   , Eq2(..), Ord2(..), Show2(..), Read2(..)
-#endif
   )
 
 import qualified Data.Foldable as F
@@ -50,16 +33,8 @@ import Prelude hiding (head, tail)
 
 -- | Base functor of @[]@.
 data ListF a b = Nil | Cons a b
-  deriving (Eq,Ord,Show,Read,Typeable
-#if HAS_GENERIC
-          , Generic
-#endif
-#if HAS_GENERIC1
-          , Generic1
-#endif
-          )
+  deriving (Eq,Ord,Show,Read,Generic,Generic1,Functor,F.Foldable,T.Traversable)
 
-#ifdef LIFTED_FUNCTOR_CLASSES
 instance Eq2 ListF where
   liftEq2 _ _ Nil        Nil          = True
   liftEq2 f g (Cons a b) (Cons a' b') = f a a' && g b b'
@@ -103,26 +78,6 @@ instance Read2 ListF where
 instance Read a => Read1 (ListF a) where
   liftReadsPrec = liftReadsPrec2 readsPrec readList
 
-#else
-instance Eq a   => Eq1   (ListF a) where eq1        = (==)
-instance Ord a  => Ord1  (ListF a) where compare1   = compare
-instance Show a => Show1 (ListF a) where showsPrec1 = showsPrec
-instance Read a => Read1 (ListF a) where readsPrec1 = readsPrec
-#endif
-
--- These instances cannot be auto-derived on with GHC <= 7.6
-instance Functor (ListF a) where
-  fmap _ Nil        = Nil
-  fmap f (Cons a b) = Cons a (f b)
-
-instance F.Foldable (ListF a) where
-  foldMap _ Nil        = Data.Monoid.mempty
-  foldMap f (Cons _ b) = f b
-
-instance T.Traversable (ListF a) where
-  traverse _ Nil        = pure Nil
-  traverse f (Cons a b) = Cons a <$> f b
-
 instance Bi.Bifunctor ListF where
   bimap _ _ Nil        = Nil
   bimap f g (Cons a b) = Cons (f a) (g b)
@@ -141,16 +96,8 @@ instance Bi.Bitraversable ListF where
 
 -- | Base Functor for 'Data.List.NonEmpty'
 data NonEmptyF a b = NonEmptyF { head :: a, tail :: Maybe b }
-  deriving (Eq,Ord,Show,Read,Typeable
-#if HAS_GENERIC
-          , Generic
-#endif
-#if HAS_GENERIC1
-          , Generic1
-#endif
-          )
+  deriving (Eq,Ord,Show,Read,Generic,Generic1,Functor,F.Foldable,T.Traversable)
 
-#ifdef LIFTED_FUNCTOR_CLASSES
 instance Eq2 NonEmptyF where
   liftEq2 f g (NonEmptyF a mb) (NonEmptyF a' mb') = f a a' && liftEq g mb mb'
 
@@ -185,23 +132,6 @@ instance Read2 NonEmptyF where
 instance Read a => Read1 (NonEmptyF a) where
   liftReadsPrec = liftReadsPrec2 readsPrec readList
 
-#else
-instance Eq a   => Eq1   (NonEmptyF a) where eq1        = (==)
-instance Ord a  => Ord1  (NonEmptyF a) where compare1   = compare
-instance Show a => Show1 (NonEmptyF a) where showsPrec1 = showsPrec
-instance Read a => Read1 (NonEmptyF a) where readsPrec1 = readsPrec
-#endif
-
--- These instances cannot be auto-derived on with GHC <= 7.6
-instance Functor (NonEmptyF a) where
-  fmap f = NonEmptyF <$> head <*> (fmap f . tail)
-
-instance F.Foldable (NonEmptyF a) where
-  foldMap f = F.foldMap f . tail
-
-instance T.Traversable (NonEmptyF a) where
-  traverse f = fmap <$> (NonEmptyF . head) <*> (T.traverse f . tail)
-
 instance Bi.Bifunctor NonEmptyF where
   bimap f g = NonEmptyF <$> (f . head) <*> (fmap g . tail)
 
@@ -218,18 +148,10 @@ instance Bi.Bitraversable NonEmptyF where
 
 -- | Base functor for 'Data.Tree.Tree'.
 data TreeF a b = NodeF a (ForestF a b)
-  deriving (Eq,Ord,Show,Read,Typeable
-#if HAS_GENERIC
-          , Generic
-#endif
-#if HAS_GENERIC1
-          , Generic1
-#endif
-          )
+  deriving (Eq,Ord,Show,Read,Generic,Generic1,Functor,F.Foldable,T.Traversable)
 
 type ForestF a b = [b]
 
-#ifdef LIFTED_FUNCTOR_CLASSES
 instance Eq2 TreeF where
   liftEq2 f g (NodeF a mb) (NodeF a' mb') = f a a' && liftEq g mb mb'
 
@@ -263,23 +185,6 @@ instance Read2 TreeF where
 
 instance Read a => Read1 (TreeF a) where
   liftReadsPrec = liftReadsPrec2 readsPrec readList
-
-#else
-instance Eq a   => Eq1   (TreeF a) where eq1        = (==)
-instance Ord a  => Ord1  (TreeF a) where compare1   = compare
-instance Show a => Show1 (TreeF a) where showsPrec1 = showsPrec
-instance Read a => Read1 (TreeF a) where readsPrec1 = readsPrec
-#endif
-
--- These instances cannot be auto-derived on with GHC <= 7.6
-instance Functor (TreeF a) where
-  fmap f (NodeF x xs) = NodeF x (fmap f xs)
-
-instance F.Foldable (TreeF a) where
-  foldMap f (NodeF _ xs) = F.foldMap f xs
-
-instance T.Traversable (TreeF a) where
-  traverse f (NodeF x xs) = NodeF x <$> T.traverse f xs
 
 instance Bi.Bifunctor TreeF where
   bimap f g (NodeF x xs) = NodeF (f x) (fmap g xs)
