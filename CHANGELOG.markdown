@@ -1,4 +1,4 @@
-## next [????-??-??]
+## 5.2.3 [2024-06-12]
 
 * Support GHC-9.10.
 * Drop support for GHC-7.10 and earlier.
