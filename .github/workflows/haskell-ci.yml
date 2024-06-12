@@ -33,29 +33,29 @@ jobs:
             compilerVersion: 9.10.1
             setup-method: ghcup
             allow-failure: false
-          - compiler: ghc-9.8.1
+          - compiler: ghc-9.8.2
             compilerKind: ghc
-            compilerVersion: 9.8.1
+            compilerVersion: 9.8.2
             setup-method: ghcup
             allow-failure: false
-          - compiler: ghc-9.6.2
+          - compiler: ghc-9.6.5
             compilerKind: ghc
-            compilerVersion: 9.6.2
+            compilerVersion: 9.6.5
             setup-method: ghcup
             allow-failure: false
-          - compiler: ghc-9.4.1
+          - compiler: ghc-9.4.8
             compilerKind: ghc
-            compilerVersion: 9.4.1
+            compilerVersion: 9.4.8
             setup-method: ghcup
             allow-failure: false
-          - compiler: ghc-9.2.1
+          - compiler: ghc-9.2.8
             compilerKind: ghc
-            compilerVersion: 9.2.1
+            compilerVersion: 9.2.8
             setup-method: ghcup
             allow-failure: false
-          - compiler: ghc-9.0.1
+          - compiler: ghc-9.0.2
             compilerKind: ghc
-            compilerVersion: 9.0.1
+            compilerVersion: 9.0.2
             setup-method: ghcup
             allow-failure: false
           - compiler: ghc-8.10.7
