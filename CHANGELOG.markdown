@@ -1,3 +1,7 @@
+## next [????-??-??]
+
+* Drop support for GHC-7.10 and earlier.
+
 ## 5.2.2.5 [2023-10-14]
 
 * Support GHC-9.6 and GHC-9.8

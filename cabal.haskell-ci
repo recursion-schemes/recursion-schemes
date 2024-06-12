@@ -1,4 +1,2 @@
 no-tests-no-benchmarks: False
 unconstrained:          False
--- AMP, extensions, etc make it harder to run with older GHCs
-docspec:                >=7.10
