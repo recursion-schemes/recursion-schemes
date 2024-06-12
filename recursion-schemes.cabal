@@ -15,7 +15,7 @@ copyright:     Copyright (C) 2008-2015 Edward A. Kmett
 synopsis:      Representing common recursion patterns as higher-order functions
 description:   Many recursive functions share the same structure, e.g. pattern-match on the input and, depending on the data constructor, either recur on a smaller input or terminate the recursion with the base case. Another one: start with a seed value, use it to produce the first element of an infinite list, and recur on a modified seed in order to produce the rest of the list. Such a structure is called a recursion scheme. Using higher-order functions to implement those recursion schemes makes your code clearer, faster, and safer. See README for details.
 
-tested-with:   GHC==8.0.2, GHC==8.2.2, GHC==8.4.4, GHC==8.6.5, GHC==8.8.4, GHC==8.10.7, GHC==9.0.1, GHC==9.2.1, GHC==9.4.1, GHC==9.6.2, GHC==9.8.1
+tested-with:   GHC==8.0.2, GHC==8.2.2, GHC==8.4.4, GHC==8.6.5, GHC==8.8.4, GHC==8.10.7, GHC==9.0.2, GHC==9.2.8, GHC==9.4.8, GHC==9.6.5, GHC==9.8.2, GHC==9.10.1
 
 build-type:    Simple
 extra-doc-files: docs/github-compression.png docs/flowchart.svg
@@ -45,7 +45,7 @@ library
 
   build-depends:
     base                 >= 4.9     && < 5,
-    containers           >= 0.4.2.1 && < 0.7,
+    containers           >= 0.4.2.1 && < 0.8,
     comonad              >= 4       && < 6,
     data-fix             >= 0.3.0   && < 0.4,
     free                 >= 4       && < 6,
@@ -61,7 +61,7 @@ library
 
   if flag(template-haskell)
     build-depends:
-      template-haskell >= 2.11.0.0 && < 2.22,
+      template-haskell >= 2.11.0.0 && < 2.23,
       th-abstraction   >= 0.4      && < 0.8
     exposed-modules:
       Data.Functor.Foldable.TH
