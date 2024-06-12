@@ -15,11 +15,11 @@ copyright:     Copyright (C) 2008-2015 Edward A. Kmett
 synopsis:      Representing common recursion patterns as higher-order functions
 description:   Many recursive functions share the same structure, e.g. pattern-match on the input and, depending on the data constructor, either recur on a smaller input or terminate the recursion with the base case. Another one: start with a seed value, use it to produce the first element of an infinite list, and recur on a modified seed in order to produce the rest of the list. Such a structure is called a recursion scheme. Using higher-order functions to implement those recursion schemes makes your code clearer, faster, and safer. See README for details.
 
-tested-with:   GHC==7.4.2, GHC==7.6.3, GHC==7.8.4, GHC==7.10.3, GHC==8.0.2, GHC==8.2.2, GHC==8.4.4, GHC==8.6.5, GHC==8.8.4, GHC==8.10.7, GHC==9.0.1, GHC==9.2.1, GHC==9.4.1, GHC==9.6.2, GHC==9.8.1
+tested-with:   GHC==8.0.2, GHC==8.2.2, GHC==8.4.4, GHC==8.6.5, GHC==8.8.4, GHC==8.10.7, GHC==9.0.1, GHC==9.2.1, GHC==9.4.1, GHC==9.6.2, GHC==9.8.1
 
 build-type:    Simple
 extra-doc-files: docs/github-compression.png docs/flowchart.svg
-extra-source-files: CHANGELOG.markdown .gitignore README.markdown include/recursion-schemes-common.h
+extra-source-files: CHANGELOG.markdown .gitignore README.markdown
 
 source-repository head
   type: git
@@ -42,39 +42,17 @@ library
     UndecidableInstances
 
   hs-source-dirs: src
-  include-dirs: include
-  -- includes: recursion-schemes-common.h
 
   build-depends:
-    base                 >= 4.5     && < 5,
+    base                 >= 4.9     && < 5,
     containers           >= 0.4.2.1 && < 0.7,
     comonad              >= 4       && < 6,
     data-fix             >= 0.3.0   && < 0.4,
     free                 >= 4       && < 6,
-    transformers         >= 0.3.0.0 && < 1
+    transformers         >= 0.4.2.0 && < 1
 
   if !impl(ghc >= 8.2)
     build-depends: bifunctors >= 4 && < 6
-
-  if !impl(ghc >= 8.0)
-    build-depends: semigroups >= 0.10 && < 1
-
-  if impl(ghc < 7.5)
-    build-depends: ghc-prim
-
-  -- Following two conditionals aren't inverses (there are other compilers than GHC)
-  --
-  -- We enforce the fact that with GHC-7.10
-  -- we have at least transformers-0.4.2.0 (the bundled one)
-  -- which has 'Data.Functor.Classes' module. (transformers-0.3 doesn't have)
-  if impl(ghc >= 7.10)
-    build-depends:
-      transformers         >= 0.4.2.0
-
-  if !impl(ghc >= 7.10)
-    build-depends:
-      nats,
-      transformers-compat  >= 0.3     && < 1
 
   -- Foldable module is first, so cabal repl loads it!
   exposed-modules:
@@ -83,8 +61,8 @@ library
 
   if flag(template-haskell)
     build-depends:
-      template-haskell >= 2.5.0.0 && < 2.22,
-      th-abstraction   >= 0.4     && < 0.7
+      template-haskell >= 2.11.0.0 && < 2.22,
+      th-abstraction   >= 0.4      && < 0.8
     exposed-modules:
       Data.Functor.Foldable.TH
 
@@ -108,5 +86,3 @@ test-suite Expr
     recursion-schemes,
     template-haskell,
     transformers     >= 0.2     && < 1
-  if impl(ghc < 7.5)
-    build-depends: ghc-prim

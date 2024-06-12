@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP, PatternGuards, Rank2Types #-}
+{-# LANGUAGE TemplateHaskellQuotes #-}
 -- This OPTIONS_GHC line is a workaround for
 -- https://gitlab.haskell.org/ghc/ghc/-/issues/18320, a bug which only occurs
 -- when running specific TemplateHaskell code while both profiling and
@@ -24,16 +25,9 @@ import Data.Functor.Identity
 import Language.Haskell.TH
 import Language.Haskell.TH.Datatype as TH.Abs
 import Language.Haskell.TH.Datatype.TyVarBndr
-import Language.Haskell.TH.Syntax (mkNameG_tc, mkNameG_v)
 import Data.Char (GeneralCategory (..), generalCategory)
-#ifndef CURRENT_PACKAGE_KEY
-import Data.Version (showVersion)
-import Paths_recursion_schemes (version)
-#endif
 
-#ifdef __HADDOCK__
 import Data.Functor.Foldable
-#endif
 
 #if !MIN_VERSION_template_haskell(2,21,0) && !MIN_VERSION_th_abstraction(0,6,0)
 type TyVarBndrVis = TyVarBndrUnit
@@ -165,13 +159,8 @@ instance MakeBaseFunctor Name where
 -- 'Base' type instance, 'Recursive' and 'Corecursive' instances.
 --
 instance MakeBaseFunctor Dec where
-#if MIN_VERSION_template_haskell(2,11,0)
     makeBaseFunctorWith rules (InstanceD overlaps ctx classHead []) = do
         let instanceFor = InstanceD overlaps ctx
-#else
-    makeBaseFunctorWith rules (InstanceD ctx classHead []) = do
-        let instanceFor = InstanceD ctx
-#endif
         case classHead of
           ConT u `AppT` t | u == recursiveTypeName || u == corecursiveTypeName -> do
               name <- headOfType t
@@ -288,17 +277,10 @@ makePrimForDI' rules mkInstance' isNewtype tyName vars cons = do
       pure $ if e then Just StockStrategy else Nothing
 #endif
     let dataDec = case consF of
-#if MIN_VERSION_template_haskell(2,11,0)
             [conF] | isNewtype ->
                 NewtypeD [] tyNameF varsF Nothing conF deriveds
             _ ->
                 DataD [] tyNameF varsF Nothing consF deriveds
-#else
-            [conF] | isNewtype ->
-                NewtypeD [] tyNameF varsF conF deriveds
-            _ ->
-                DataD [] tyNameF varsF consF deriveds
-#endif
           where
             deriveds =
 #if MIN_VERSION_template_haskell(2,12,0)
@@ -306,12 +288,10 @@ makePrimForDI' rules mkInstance' isNewtype tyName vars cons = do
                 [ ConT functorTypeName
                 , ConT foldableTypeName
                 , ConT traversableTypeName ]]
-#elif MIN_VERSION_template_haskell(2,11,0)
+#else
               [ ConT functorTypeName
               , ConT foldableTypeName
               , ConT traversableTypeName ]
-#else
-              [functorTypeName, foldableTypeName, traversableTypeName]
 #endif
 
     -- type instance Base
@@ -322,11 +302,7 @@ makePrimForDI' rules mkInstance' isNewtype tyName vars cons = do
         mkInstance = case mkInstance' of
             Just f  -> f
             Nothing -> \n ->
-#if MIN_VERSION_template_haskell(2,11,0)
                 InstanceD Nothing [] (ConT n `AppT` s)
-#else
-                InstanceD [] (ConT n `AppT` s)
-#endif
 
     -- instance Recursive
     projDec <- FunD projectValName <$> mkMorphism id (_baseRulesCon rules) cons'
@@ -428,11 +404,9 @@ substType a b = go
     go (ForallT xs ctx t) = ForallT xs ctx (go t)
     -- This may fail with kind error
     go (SigT t k)         = SigT (go t) k
-#if MIN_VERSION_template_haskell(2,11,0)
     go (InfixT l n r)     = InfixT (go l) n (go r)
     go (UInfixT l n r)    = UInfixT (go l) n (go r)
     go (ParensT t)        = ParensT (go t)
-#endif
     -- Rest are unchanged
     go x = x
 
@@ -459,7 +433,6 @@ toCon (ConstructorInfo { constructorName       = name
             -> error $ "makeBaseFunctor: Encountered an InfixConstructor "
                     ++ "without exactly two fields"
   where
-#if MIN_VERSION_template_haskell(2,11,0)
     toBang (FieldStrictness upkd strct) = Bang (toSourceUnpackedness upkd)
                                                (toSourceStrictness strct)
       where
@@ -472,16 +445,6 @@ toCon (ConstructorInfo { constructorName       = name
         toSourceStrictness UnspecifiedStrictness = NoSourceStrictness
         toSourceStrictness Lazy                  = SourceLazy
         toSourceStrictness TH.Abs.Strict         = SourceStrict
-#else
-    -- On old versions of Template Haskell, there isn't as rich of strictness
-    -- information available, so the conversion is somewhat lossy. We try our
-    -- best to recognize certain common combinations, and fall back to NotStrict
-    -- in the event there's an exotic combination.
-    toBang (FieldStrictness UnspecifiedUnpackedness Strict)                = IsStrict
-    toBang (FieldStrictness UnspecifiedUnpackedness UnspecifiedStrictness) = NotStrict
-    toBang (FieldStrictness Unpack Strict)                                 = Unpacked
-    toBang FieldStrictness{}                                               = NotStrict
-#endif
 
 -------------------------------------------------------------------------------
 -- Compat from base-4.9
@@ -502,45 +465,31 @@ isPuncChar :: Char -> Bool
 isPuncChar c = c `elem` ",;()[]{}`"
 
 -------------------------------------------------------------------------------
--- Manually quoted names
+-- TH-quoted names
 -------------------------------------------------------------------------------
--- By manually generating these names we avoid needing to use the
--- TemplateHaskell language extension when compiling this library.
--- This allows the library to be used in stage1 cross-compilers.
-
-rsPackageKey :: String
-#ifdef CURRENT_PACKAGE_KEY
-rsPackageKey = CURRENT_PACKAGE_KEY
-#else
-rsPackageKey = "recursion-schemes-" ++ showVersion version
-#endif
-
-mkRsName_tc :: String -> String -> Name
-mkRsName_tc = mkNameG_tc rsPackageKey
-
-mkRsName_v :: String -> String -> Name
-mkRsName_v = mkNameG_v rsPackageKey
+-- Note that this module only TemplateHaskellQuotes, not TemplateHaskell,
+-- which makes lens able to be used in stage1 cross-compilers.
 
 baseTypeName :: Name
-baseTypeName = mkRsName_tc "Data.Functor.Foldable" "Base"
+baseTypeName = ''Base
 
 recursiveTypeName :: Name
-recursiveTypeName = mkRsName_tc "Data.Functor.Foldable" "Recursive"
+recursiveTypeName = ''Recursive
 
 corecursiveTypeName :: Name
-corecursiveTypeName = mkRsName_tc "Data.Functor.Foldable" "Corecursive"
+corecursiveTypeName = ''Corecursive
 
 projectValName :: Name
-projectValName = mkRsName_v "Data.Functor.Foldable" "project"
+projectValName = 'project
 
 embedValName :: Name
-embedValName = mkRsName_v "Data.Functor.Foldable" "embed"
+embedValName = 'embed
 
 functorTypeName :: Name
-functorTypeName = mkNameG_tc "base" "GHC.Base" "Functor"
+functorTypeName = ''Functor
 
 foldableTypeName :: Name
-foldableTypeName = mkNameG_tc "base" "Data.Foldable" "Foldable"
+foldableTypeName = ''Foldable
 
 traversableTypeName :: Name
-traversableTypeName = mkNameG_tc "base" "Data.Traversable" "Traversable"
+traversableTypeName = ''Traversable
