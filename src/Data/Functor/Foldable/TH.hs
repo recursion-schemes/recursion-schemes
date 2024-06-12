@@ -324,13 +324,9 @@ mkMorphism
 mkMorphism nFrom nTo args = for args $ \ci -> do
     let n = constructorName ci
     fs <- replicateM (length (constructorFields ci)) (newName "x")
-#if MIN_VERSION_template_haskell(2,18,0)
-    pure $ Clause [ConP (nFrom n) [] (map VarP fs)]                   -- patterns
-#else
-    pure $ Clause [ConP (nFrom n) (map VarP fs)]                      -- patterns
-#endif
-                  (NormalB $ foldl AppE (ConE $ nTo n) (map VarE fs)) -- body
-                  [] -- where dec
+    clause [conP (nFrom n) (map varP fs)]                            -- patterns
+                 (normalB $ foldl appE (conE $ nTo n) (map varE fs)) -- body
+                 [] -- where dec
 
 -------------------------------------------------------------------------------
 -- Traversals
