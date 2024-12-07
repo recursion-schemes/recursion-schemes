@@ -1,1 +1,13 @@
 packages: .
+
+tests: True
+
+test-show-details: direct
+
+if impl (ghc >= 9.12)
+  allow-newer:
+    , assoc:base
+    , data-fix:base
+    , hashable:base
+    , indexed-traversable:base
+    , unordered-containers:template-haskell
