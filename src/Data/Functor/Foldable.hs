@@ -392,7 +392,7 @@ fold = cata
 --
 -- >>> :{
 -- >>> let ourEnumFromTo :: Int -> Int -> [Int]
--- >>>     ourEnumFromTo lo hi = ana go lo where
+-- >>>     ourEnumFromTo lo hi = unfold go lo where
 -- >>>         go i = if i > hi then Nil else Cons i (i + 1)
 -- >>> :}
 --
