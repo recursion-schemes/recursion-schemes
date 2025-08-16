@@ -3,6 +3,7 @@
 {-# LANGUAGE ConstrainedClassMethods #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE ScopedTypeVariables, DefaultSignatures, MultiParamTypeClasses, TypeOperators #-}
+{-# LANGUAGE QuantifiedConstraints #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -19,11 +20,14 @@
 module Data.Functor.Foldable
   (
   -- * Base functors
-    Base
-  , ListF(..)
+    ListF(..)
   -- * Type classes
+  , Fixed(Base)
   , Recursive(project)
   , Corecursive(embed)
+  , Fixed1(Base1)
+  , Recursive1
+  , Corecursive1
   -- * Folding functions
   -- $foldingFunctions
   , fold
@@ -107,9 +111,10 @@ import qualified Control.Monad.Free.Church as CMFC
 import Control.Monad.Trans.Except (ExceptT(..), runExceptT)
 import           Control.Monad.Trans.Free (FreeF, FreeT(..))
 import qualified Control.Monad.Trans.Free as CMTF
+import Data.Bifunctor
+import Data.Bifunctor.Tannen
 import Data.Functor.Identity
 import Control.Arrow
-import Data.Functor.Compose (Compose(..))
 import Data.List.NonEmpty(NonEmpty((:|)), nonEmpty, toList)
 import Data.Tree (Tree (..))
 import GHC.Generics (Generic (..), M1 (..), V1, U1, K1 (..), (:+:) (..), (:*:) (..))
@@ -163,24 +168,29 @@ import Data.Fix (Fix (..), unFix, Mu (..), Nu (..))
 --          |
 --          `- 3112
 
--- | Obtain the base functor for a recursive datatype.
---
--- The core idea of this library is that instead of writing recursive functions
--- on a recursive datatype, we prefer to write non-recursive functions on a
--- related, non-recursive datatype we call the "base functor".
---
--- For example, @[a]@ is a recursive type, and its corresponding base functor is
--- @'ListF' a@:
---
--- @
--- data 'ListF' a b = 'Nil' | 'Cons' a b
--- type instance 'Base' [a] = 'ListF' a
--- @
---
--- The relationship between those two types is that if we replace @b@ with
--- @'ListF' a@, we obtain a type which is isomorphic to @[a]@.
---
-type family Base t :: * -> *
+class Fixed t where
+  -- | Obtain the base functor for a recursive datatype.
+  --
+  -- The core idea of this library is that instead of writing recursive functions
+  -- on a recursive datatype, we prefer to write non-recursive functions on a
+  -- related, non-recursive datatype we call the "base functor".
+  --
+  -- For example, @[a]@ is a recursive type, and its corresponding base functor is
+  -- @'ListF' a@:
+  --
+  -- @
+  -- data 'ListF' a b = 'Nil' | 'Cons' a b
+  -- type instance 'Base' [a] = 'ListF' a
+  -- @
+  --
+  -- The relationship between those two types is that if we replace @b@ with
+  -- @'ListF' a@, we obtain a type which is isomorphic to @[a]@.
+  --
+  type Base t :: * -> *
+
+class (forall a . Fixed (t a)) => Fixed1 t where
+  type Base1 t :: * -> * -> *
+
 
 -- | A recursive datatype which can be unrolled one recursion layer at a time.
 --
@@ -190,7 +200,7 @@ type family Base t :: * -> *
 --
 -- Typically, 'Recursive' types also have a 'Corecursive' instance, in which
 -- case 'project' and 'embed' are inverses.
-class Functor (Base t) => Recursive t where
+class (Fixed t, Functor (Base t)) => Recursive t where
   -- | Unroll a single recursion layer.
   --
   -- >>> project [1,2,3]
@@ -307,6 +317,8 @@ distPara = distZygo embed
 distParaT :: (Corecursive t, Comonad w) => (forall b. Base t (w b) -> w (Base t b)) -> Base t (EnvT t w a) -> EnvT t w (Base t a)
 distParaT t = distZygoT embed t
 
+class (forall a . Recursive (t a), Bifunctor (Base1 t), Functor t) => Recursive1 t
+
 -- | A recursive datatype which can be rolled up one recursion layer at a time.
 --
 -- For example, a value of type @'ListF' a [a]@ can be rolled up into a @[a]@.
@@ -315,7 +327,7 @@ distParaT t = distZygoT embed t
 --
 -- Typically, 'Corecursive' types also have a 'Recursive' instance, in which
 -- case 'embed' and 'project' are inverses.
-class Functor (Base t) => Corecursive t where
+class (Fixed t, Functor (Base t)) => Corecursive t where
 
   -- | Roll up a single recursion layer.
   --
@@ -401,6 +413,8 @@ fold = cata
 unfold :: Corecursive t => (a -> Base t a) -> a -> t
 unfold = ana
 
+class (forall a . Corecursive (t a), Bifunctor (Base1 t), Functor t) => Corecursive1 t
+
 -- | An optimized version of @fold f . unfold g@.
 --
 -- Useful when your recursion structure is shaped like a particular recursive
@@ -425,7 +439,12 @@ unfold = ana
 refold :: Functor f => (f b -> b) -> (a -> f a) -> a -> b
 refold = hylo
 
-type instance Base [a] = ListF a
+instance Fixed [a] where
+  type Base [a] = Base1 [] a
+
+instance Fixed1 [] where
+  type Base1 [] = ListF
+
 instance Recursive [a] where
   project (x:xs) = Cons x xs
   project [] = Nil
@@ -442,41 +461,57 @@ instance Corecursive [a] where
     Cons x (Right b) -> x : apo f b
     Nil -> []
 
-type instance Base (NonEmpty a) = NonEmptyF a
+instance Fixed (NonEmpty a) where
+  type Base (NonEmpty a) = Base1 NonEmpty a
+instance Fixed1 NonEmpty where
+  type Base1 NonEmpty = NonEmptyF
 instance Recursive (NonEmpty a) where
   project (x:|xs) = NonEmptyF x $ nonEmpty xs
 instance Corecursive (NonEmpty a) where
   embed = (:|) <$> NEF.head <*> (maybe [] toList <$> NEF.tail)
 
-type instance Base (Tree a) = TreeF a
+instance Fixed (Tree a) where
+  type Base (Tree a) = Base1 Tree a
+instance Fixed1 Tree where
+  type Base1 Tree = TreeF
 instance Recursive (Tree a) where
   project (Node x xs) = NodeF x xs
 instance Corecursive (Tree a) where
   embed (NodeF x xs) = Node x xs
 
-type instance Base Natural = Maybe
+instance Fixed Natural where
+  type Base Natural = Maybe
 instance Recursive Natural where
   project 0 = Nothing
   project n = Just (n - 1)
 instance Corecursive Natural where
   embed = maybe 0 (+1)
 
--- | Cofree comonads are Recursive/Corecursive
-type instance Base (Cofree f a) = CofreeF f a
+instance Fixed (Cofree f a) where
+  type Base (Cofree f a) = Base1 (Cofree f) a
+instance Fixed1 (Cofree f) where
+  type Base1 (Cofree f) = CofreeF f
 instance Functor f => Recursive (Cofree f a) where
   project (x :< xs) = x CCTC.:< xs
 instance Functor f => Corecursive (Cofree f a) where
   embed (x CCTC.:< xs) = x :< xs
 
 -- | Cofree tranformations of comonads are Recursive/Corecusive
-type instance Base (CofreeT f w a) = Compose w (CofreeF f a)
+instance Fixed (CofreeT f w a) where
+  type Base (CofreeT f w a) = Base1 (CofreeT f w) a
+instance Fixed1 (CofreeT f w) where
+  type Base1 (CofreeT f w) = Tannen w (CofreeF f)
 instance (Functor w, Functor f) => Recursive (CofreeT f w a) where
-  project = Compose . runCofreeT
+  project = Tannen . runCofreeT
 instance (Functor w, Functor f) => Corecursive (CofreeT f w a) where
-  embed = CofreeT . getCompose
+  embed = CofreeT . runTannen
 
 -- | Free monads are Recursive/Corecursive
-type instance Base (Free f a) = FreeF f a
+instance Fixed (Free f a) where
+  type Base (Free f a) = Base1 (Free f) a
+
+instance Fixed1 (Free f) where
+  type Base1 (Free f) = FreeF f
 
 instance Functor f => Recursive (Free f a) where
   project (Pure a) = CMTF.Pure a
@@ -493,11 +528,14 @@ instance Functor f => Corecursive (Free f a) where
   gpostpro dist nat coalg = improveF . gpostpro dist nat coalg
 
 -- | Free transformations of monads are Recursive/Corecursive
-type instance Base (FreeT f m a) = Compose m (FreeF f a)
+instance Fixed (FreeT f m a) where
+  type Base (FreeT f m a) = Base1 (FreeT f m) a
+instance Fixed1 (FreeT f m) where
+  type Base1 (FreeT f m) = Tannen m (FreeF f)
 instance (Functor m, Functor f) => Recursive (FreeT f m a) where
-  project = Compose . runFreeT
+  project = Tannen . runFreeT
 instance (Functor m, Functor f) => Corecursive (FreeT f m a) where
-  embed = FreeT . getCompose
+  embed = FreeT . runTannen
 
 -- If you are looking for instances for the free MonadPlus, please use the
 -- instance for FreeT f [].
@@ -508,12 +546,18 @@ instance (Functor m, Functor f) => Corecursive (FreeT f m a) where
 -- this package only implements uniformly recursive folds / unfolds.
 
 -- | Example boring stub for non-recursive data types
-type instance Base (Maybe a) = Const (Maybe a)
+instance Fixed (Maybe a) where
+  type Base (Maybe a) = Const (Maybe a)
+-- instance Fixed1 Maybe where
+--   type Base1 Maybe = Biff Const Maybe Identity
 instance Recursive (Maybe a) where project = Const
 instance Corecursive (Maybe a) where embed = getConst
 
 -- | Example boring stub for non-recursive data types
-type instance Base (Either a b) = Const (Either a b)
+instance Fixed (Either a b) where
+  type Base (Either a b) = Const (Either a b)
+-- instance Fixed1 (Either a) where
+--   type Base1 (Either a) = Biff Const (Either a) Identity
 instance Recursive (Either a b) where project = Const
 instance Corecursive (Either a b) where embed = getConst
 
@@ -579,7 +623,8 @@ distGFutu k = d where
 -- Fix
 -------------------------------------------------------------------------------
 
-type instance Base (Fix f) = f
+instance Fixed (Fix f) where
+  type Base (Fix f) = f
 instance Functor f => Recursive (Fix f) where
   project (Fix a) = a
 instance Functor f => Corecursive (Fix f) where
@@ -614,14 +659,16 @@ lambek = cata (fmap embed)
 colambek :: (Recursive t, Corecursive t) => (Base t t -> t)
 colambek = ana (fmap project)
 
-type instance Base (Mu f) = f
+instance Fixed (Mu f) where
+  type Base (Mu f) = f
 instance Functor f => Recursive (Mu f) where
   project = lambek
   cata f (Mu g) = g f
 instance Functor f => Corecursive (Mu f) where
   embed m = Mu (\f -> f (fmap (fold f) m))
 
-type instance Base (Nu f) = f
+instance Fixed (Nu f) where
+  type Base (Nu f) = f
 instance Functor f => Corecursive (Nu f) where
   embed = colambek
   ana = Nu
@@ -630,7 +677,10 @@ instance Functor f => Recursive (Nu f) where
 
 -- | Church encoded free monads are Recursive/Corecursive, in the same way that
 -- 'Mu' is.
-type instance Base (CMFC.F f a) = FreeF f a
+instance Fixed (CMFC.F f a) where
+  type Base (CMFC.F f a) = Base1 (CMFC.F f) a
+instance Fixed1 (CMFC.F f) where
+  type Base1 (CMFC.F f) = FreeF f
 cmfcCata :: (a -> r) -> (f r -> r) -> CMFC.F f a -> r
 cmfcCata p f (CMFC.F run) = run p f
 instance Functor f => Recursive (CMFC.F f a) where
