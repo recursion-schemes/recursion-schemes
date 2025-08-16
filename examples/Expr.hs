@@ -53,7 +53,8 @@ data Expr3F a b
     | OpFF b b Bool Bool Bool
   deriving (Show, Generic, Functor)
 
-type instance Base (Expr3 a) = (Expr3F a)
+instance Fixed (Expr3 a) where
+  type Base (Expr3 a) = (Expr3F a)
 instance Recursive (Expr3 a)
 instance Corecursive (Expr3 a)
 

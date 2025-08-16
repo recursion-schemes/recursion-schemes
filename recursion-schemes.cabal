@@ -45,6 +45,7 @@ library
 
   build-depends:
     base                 >= 4.9     && < 5,
+    bifunctors           >= 4.2     && < 6,
     containers           >= 0.4.2.1 && < 0.8,
     comonad              >= 4       && < 6,
     data-fix             >= 0.3.0   && < 0.4,

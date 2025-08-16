@@ -304,6 +304,9 @@ makePrimForDI' rules mkInstance' isNewtype tyName vars cons = do
             Nothing -> \n ->
                 InstanceD Nothing [] (ConT n `AppT` s)
 
+    -- instance Fixed
+    let fixedDec = mkInstance fixedTypeName [baseDec]
+
     -- instance Recursive
     projDec <- FunD projectValName <$> mkMorphism id (_baseRulesCon rules) cons'
     let recursiveDec = mkInstance recursiveTypeName [projDec]
@@ -313,7 +316,7 @@ makePrimForDI' rules mkInstance' isNewtype tyName vars cons = do
     let corecursiveDec = mkInstance corecursiveTypeName [embedDec]
 
     -- Combine
-    A.pure [dataDec, baseDec, recursiveDec, corecursiveDec]
+    A.pure [dataDec, fixedDec, recursiveDec, corecursiveDec]
 
 -- | makes clauses to rename constructors
 mkMorphism
@@ -469,6 +472,9 @@ isPuncChar c = c `elem` ",;()[]{}`"
 -------------------------------------------------------------------------------
 -- Note that this module only TemplateHaskellQuotes, not TemplateHaskell,
 -- which makes lens able to be used in stage1 cross-compilers.
+
+fixedTypeName :: Name
+fixedTypeName = ''Fixed
 
 baseTypeName :: Name
 baseTypeName = ''Base
