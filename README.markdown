@@ -33,7 +33,7 @@ product = foldr (*) 1
 
 ```haskell
 depth :: Tree a -> Int
-depth (Node _ subTrees) = 1 + maximum subTrees
+depth (Node _ subTrees) = 1 + maximum (0:subTrees)
 
 size :: Tree a -> Int
 size (Node _ subTrees) = 1 + sum subTrees
@@ -54,7 +54,7 @@ depth :: Tree a -> Int
 depth = cata go
   where
     go :: TreeF a Int -> Int
-    go (NodeF _ subDepths) = 1 + maximum subDepths
+    go (NodeF _ subDepths) = 1 + maximum (0:subDepths)
 
 size :: Tree a -> Int
 size = cata go
@@ -67,7 +67,7 @@ In this example, the code is a bit longer, but it is correct. Did you spot the m
 
 ```haskell
 depth :: Tree a -> Int
-depth (Node _ subTrees) = 1 + maximum (fmap depth subTrees)
+depth (Node _ subTrees) = 1 + maximum (0:fmap depth subTrees)
 
 size :: Tree a -> Int
 size (Node _ subTrees) = 1 + sum (fmap size subTrees)
@@ -75,7 +75,7 @@ size (Node _ subTrees) = 1 + sum (fmap size subTrees)
 
 `cata` automatically adds this call to `fmap`. This is why `subDepths` contains a list of already-computed depths, not a list of sub-trees. In general, each recursive position is replaced by the result of a recursive call. These results have type `Int`, not type `Tree`, so we need a helper datatype `TreeF` to collect these results.
 
-When you think about computing the depth, you probably think "it's 1 plus the maximum of the sub-depths". With `cata`, this is exactly what we write. By contrast, without `cata`, we need to describe both the "how" and the "what" in our implementation. The "how" is about recurring over the sub-trees (using `fmap depth`), while the "what" is about adding 1 to the maximum of the sub-trees. `cata` takes care of the recursion, so you can focus solely on the "what".
+When you think about computing the depth, you probably think "it's 1 plus the maximum of the sub-depths (and zero for an empty sub-forest case)". With `cata`, this is exactly what we write. By contrast, without `cata`, we need to describe both the "how" and the "what" in our implementation. The "how" is about recurring over the sub-trees (using `fmap depth`), while the "what" is about adding 1 to the maximum of the sub-trees. `cata` takes care of the recursion, so you can focus solely on the "what".
 
 A **recursion-scheme** is a function like `cata` which implements a common recursion pattern. It is a higher-order recursive function which takes a non-recursive function as an argument. That non-recursive function describes the part which is unique to your calculation: the "what".
 
