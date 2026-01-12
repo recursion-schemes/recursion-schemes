@@ -18,12 +18,11 @@ description:   Many recursive functions share the same structure, e.g. pattern-m
 tested-with:   GHC==8.0.2, GHC==8.2.2, GHC==8.4.4, GHC==8.6.5, GHC==8.8.4, GHC==8.10.7, GHC==9.0.2, GHC==9.2.8, GHC==9.4.8, GHC==9.6.6, GHC==9.8.4, GHC==9.10.1, GHC==9.12.1
 
 build-type:    Simple
-extra-doc-files: docs/github-compression.png docs/flowchart.svg
-extra-source-files: CHANGELOG.markdown .gitignore README.markdown
+extra-doc-files: docs/github-compression.png docs/flowchart.svg CHANGELOG.markdown .gitignore README.markdown
 
 source-repository head
   type: git
-  location: git://github.com/ekmett/recursion-schemes.git
+  location: https://github.com/ekmett/recursion-schemes
 
 flag template-haskell
   description: About Template Haskell derivations
@@ -84,5 +83,4 @@ test-suite Expr
     base,
     HUnit <1.7,
     recursion-schemes,
-    template-haskell,
-    transformers     >= 0.2     && < 1
+    template-haskell
