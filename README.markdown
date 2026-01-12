@@ -13,9 +13,9 @@ sum :: [Int] -> Int
 sum [] = 0
 sum (x:xs) = x + sum xs
 
-product :: [Int] -> Int
-product [] = 1
-product (x:xs) = x * product xs
+maximum0 :: [Int] -> Int
+maximum0 [] = 0
+maximum0 (x:xs) = max x $ maximum0 xs
 ```
 
 These functions are very similar. In both cases, the empty list is the base case. In the cons case, each makes a recursive call on the tail of the list. Then, the head of the list is combined with the result using a binary function.
@@ -23,8 +23,8 @@ These functions are very similar. In both cases, the empty list is the base case
 We can abstract over those similarities using a higher-order function, [`foldr`](https://hackage.haskell.org/package/base/docs/Data-List.html#v:foldr):
 
 ```haskell
-sum     = foldr (+) 0
-product = foldr (*) 1
+sum      = foldr (+) 0
+maximum0 = foldr max 0
 ```
 
 ## Other recursive types
@@ -33,7 +33,7 @@ product = foldr (*) 1
 
 ```haskell
 depth :: Tree a -> Int
-depth (Node _ subTrees) = 1 + maximum subTrees
+depth (Node _ subTrees) = 1 + maximum0 subTrees
 
 size :: Tree a -> Int
 size (Node _ subTrees) = 1 + sum subTrees
@@ -54,7 +54,7 @@ depth :: Tree a -> Int
 depth = cata go
   where
     go :: TreeF a Int -> Int
-    go (NodeF _ subDepths) = 1 + maximum subDepths
+    go (NodeF _ subDepths) = 1 + maximum0 subDepths
 
 size :: Tree a -> Int
 size = cata go
@@ -67,7 +67,7 @@ In this example, the code is a bit longer, but it is correct. Did you spot the m
 
 ```haskell
 depth :: Tree a -> Int
-depth (Node _ subTrees) = 1 + maximum (fmap depth subTrees)
+depth (Node _ subTrees) = 1 + maximum0 (fmap depth subTrees)
 
 size :: Tree a -> Int
 size (Node _ subTrees) = 1 + sum (fmap size subTrees)
