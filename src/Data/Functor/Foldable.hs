@@ -32,6 +32,7 @@ module Data.Functor.Foldable
   , para
   , histo
   , zygo
+  , accu
   -- * Unfolding functions
   , unfold
   , ana
@@ -306,6 +307,91 @@ distPara = distZygo embed
 
 distParaT :: (Corecursive t, Comonad w) => (forall b. Base t (w b) -> w (Base t b)) -> Base t (EnvT t w a) -> EnvT t w (Base t a)
 distParaT t = distZygoT embed t
+
+-- | A fold with an accumulation parameter
+--
+-- __An example is reversing a list__
+--
+-- First we define an accumulation strategy, i.e. how we accumulate
+-- in each recursion step. In this case we will call it @consStrategy@.
+-- Note that this defines how we accumulate the parameter in /any/
+-- @ListF@-algebra (hence the carrier @b@).
+--
+-- >>> :{
+-- let consStrategy :: [a] -> ListF a b ->  ListF a ([a], b)
+--     consStrategy acc = \case
+--       Nil -> Nil
+--       Cons a as -> Cons a (a : acc, as)
+-- :}
+--
+-- Next, we define the @reverse'@ fuction that `accu`-folds the
+-- an algebra that also takes the accumulating parameter.
+--
+-- >>> :{
+-- let reverse' :: [a] -> [a]
+--     reverse' = accu consStrategy alg []
+--       where
+--         alg acc = \case
+--           Nil -> acc
+--           Cons _ as -> as
+-- :}
+--
+-- >>> reverse' [1..4]
+-- [4,3,2,1]
+--
+-- __An example of using the same strategy for different `accu`-folds__
+--
+-- Here, we will define an accumulation strategy that sums the
+-- elements of the list and then use it in two `accu`-folds.
+-- The first is to calculate the running sum of a list of `Num`
+-- elements, while the second sums the running sum multiplied with
+-- the current element.
+--
+-- First, we define the strategy as follows (note again that the
+-- carrier is /any/ @b@):
+--
+-- >>> :{
+-- let sumStrategy :: (Num a) => a -> ListF a b -> ListF a (a, b)
+--     sumStrategy acc = \case
+--       Nil -> Nil
+--       Cons a as -> Cons a (a + acc, as)
+-- :}
+--
+-- The running sum fold we define as follows:
+--
+-- >>> :{
+-- let runningSum :: (Num a) => [a] -> [a]
+--     runningSum = accu sumStrategy alg 0
+--       where
+--         alg acc = \case
+--           Nil -> [acc]
+--           Cons _ as -> acc : as
+-- :}
+--
+-- >>> runningSum [1..10]
+-- [0,1,3,6,10,15,21,28,36,45,55]
+--
+-- Now, we can reuse @sumStrategy@ to define another `accu`-fold:
+--
+-- >>> :{
+-- let runningSumMultiply :: forall a. (Num a, Ord a) => [a] -> a
+--     runningSumMultiply = accu sumStrategy alg 0
+--       where
+--         alg acc = \case
+--           Nil -> 0
+--           Cons s as -> s * acc + as
+-- :}
+--
+-- >>> runningSumMultiply [1..5]
+-- 85
+accu
+  :: forall t p a. (Functor (Base t), Recursive t)
+  => (forall x. p -> Base t x -> Base t (p, x))
+  -> (p -> Base t a -> a)
+  -> p
+  -> t
+  -> a
+accu st alg p t = c where c = alg p (fmap (uncurry (accu st alg)) (st p (project t)))
 
 -- | A recursive datatype which can be rolled up one recursion layer at a time.
 --
