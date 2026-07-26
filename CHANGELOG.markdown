@@ -1,3 +1,8 @@
+## 5.2.4 [2026-01-12]
+
+* Support GHC-9.14.
+* Update dependencies.
+
 ## 5.2.3 [2024-06-12]
 
 * Support GHC-9.10.
