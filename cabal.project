@@ -3,3 +3,16 @@ packages: .
 tests: True
 
 test-show-details: direct
+
+if impl (ghc >= 10.0)
+  allow-newer:
+    , array:base
+    , bifunctors:template-haskell
+    , data-fix:base
+    , hashable:base
+    , free:template-haskell
+    , indexed-traversable:base
+    , indexed-traversable:template-haskell
+    , tagged:template-haskell
+    , th-abstraction:template-haskell
+    , unordered-containers:template-haskell
