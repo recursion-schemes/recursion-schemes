@@ -3,12 +3,3 @@ packages: .
 tests: True
 
 test-show-details: direct
-
-if impl (ghc >= 9.14)
-  allow-newer:
-    , binary:containers
-    , indexed-traversable:base
-    , indexed-traversable:containers
-    , indexed-traversable:template-haskell
-    , template-haskell:base
-    , transformers:base
