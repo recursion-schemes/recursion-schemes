@@ -4,11 +4,15 @@ tests: True
 
 test-show-details: direct
 
-if impl (ghc >= 9.14)
+if impl (ghc >= 10.0)
   allow-newer:
-    , binary:containers
+    , array:base
+    , bifunctors:template-haskell
+    , data-fix:base
+    , hashable:base
+    , free:template-haskell
     , indexed-traversable:base
-    , indexed-traversable:containers
     , indexed-traversable:template-haskell
-    , template-haskell:base
-    , transformers:base
+    , tagged:template-haskell
+    , th-abstraction:template-haskell
+    , unordered-containers:template-haskell
